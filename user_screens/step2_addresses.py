@@ -1,5 +1,5 @@
 """
-screens/step2_addresses.py – Step 2: Sender and recipient addresses.
+user_screens/step2_addresses.py – Step 2: Sender and recipient addresses.
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -9,7 +9,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
 
-from screens.base_screen import BaseScreen
+from user_screens.base_screen import BaseScreen
 from theme import Colors, StepIndicator, RoundedButton, ZippyInput
 
 

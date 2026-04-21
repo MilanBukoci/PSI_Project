@@ -1,5 +1,5 @@
 """
-screens/step3_payment.py – Step 3: Order summary + payment method selection.
+user_screens/step3_payment.py – Step 3: Order summary + payment method selection.
 Handles both the normal and payment-failed states.
 """
 
@@ -10,7 +10,7 @@ from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.metrics import dp
 from kivy.properties import StringProperty
 
-from screens.base_screen import BaseScreen
+from user_screens.base_screen import BaseScreen
 from theme import Colors, StepIndicator, RoundedButton
 
 

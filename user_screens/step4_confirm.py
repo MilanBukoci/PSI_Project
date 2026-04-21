@@ -1,5 +1,5 @@
 """
-screens/step4_confirm.py – Step 4: Order confirmed screen.
+user_screens/step4_confirm.py – Step 4: Order confirmed screen.
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -7,7 +7,7 @@ from kivy.uix.label import Label
 from kivy.graphics import Color, RoundedRectangle, Ellipse
 from kivy.metrics import dp
 
-from screens.base_screen import BaseScreen
+from user_screens.base_screen import BaseScreen
 from theme import Colors, StepIndicator, RoundedButton
 
 

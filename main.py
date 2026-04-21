@@ -8,18 +8,19 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, SlideTransition
 
-from screens.home import HomeScreen
-from screens.step1_package import Step1PackageScreen
-from screens.step2_addresses import Step2AddressesScreen
-from screens.step3_payment import Step3PaymentScreen
-from screens.step4_confirm import Step4ConfirmScreen
+import login_screen
+from user_screens.home import HomeScreen
+from user_screens.step1_package import Step1PackageScreen
+from user_screens.step2_addresses import Step2AddressesScreen
+from user_screens.step3_payment import Step3PaymentScreen
+from user_screens.step4_confirm import Step4ConfirmScreen
 from services.socket_service import SocketService
 from services.shipment_service import ShipmentService
 
 # ── Teammate screen imports go here ──────────────────────────────────────────
-# Tomáš  (UC01): from screens.uc01_redirect import UC01RedirectScreen
-# Adam   (UC02): from screens.uc02_assign  import UC02AssignScreen
-# Milan  (UC04): from screens.uc04_deliver import UC04DeliverScreen
+# Tomáš  (UC01): from user_screens.uc01_redirect import UC01RedirectScreen
+# Adam   (UC02): from user_screens.uc02_assign  import UC02AssignScreen
+# Milan  (UC04): from user_screens.uc04_deliver import UC04DeliverScreen
 # Importing the screen file automatically registers it on HomeScreen.
 # -----------------------------------------------------------------------------
 
@@ -29,6 +30,8 @@ KV = """
 #:import SlideTransition kivy.uix.screenmanager.SlideTransition
 
 ScreenManager:
+    LoginScreen:
+        name: 'login'
     HomeScreen:
         name: 'home'
     Step1PackageScreen:

@@ -1,7 +1,7 @@
 """
-screens/base_screen.py – Base class all Zippy screens inherit from.
+user_screens/base_screen.py – Base class all Zippy user_screens inherit from.
 """
-
+from kivy.graphics.svg import Window
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -11,22 +11,11 @@ from kivy.graphics import Color, Rectangle, RoundedRectangle
 from kivy.metrics import dp
 from kivy.app import App
 
-from theme import Colors, RoundedButton, BottomNav
+from services.login_auth import AuthService
+from theme import Colors, RoundedButton, BottomNav, ZippyInput, ZippyLabel
 
 
-class BaseScreen(Screen):
-    """
-    Provides the common shell:
-      ┌──────────────────┐
-      │   Blue Header    │
-      ├──────────────────┤
-      │   content_area   │  ← subclasses fill this
-      ├──────────────────┤
-      │    Bottom Nav    │
-      └──────────────────┘
-    Plus a floating orange + FAB button.
-    """
-
+class LoginScreen(Screen):
     HEADER_HEIGHT = dp(80)
     NAV_HEIGHT    = dp(60)
     FAB_SIZE      = dp(52)
@@ -48,21 +37,13 @@ class BaseScreen(Screen):
         )
         self._root.add_widget(self._main)
 
-        self._build_header()
-
-        # Step indicator slot — empty by default
-        self.step_bar = BoxLayout(size_hint_y=None, height=0)
-
-
-        self._main.add_widget(self.step_bar)
-
         self.content_area = BoxLayout(orientation="vertical",
                                       padding=[dp(16), dp(32)],
                                       spacing=dp(10))
         self.content_area.bind(minimum_height=self.content_area.setter("height"))
         self._main.add_widget(self.content_area)
-        self._build_nav()
-        self._build_fab()
+
+        self._build_login()
 
         self.build_content()
 
@@ -106,7 +87,7 @@ class BaseScreen(Screen):
             size_hint_x=0.8,
         )
         logo_lbl.bind(size=logo_lbl.setter("text_size"))
-        profile_btn = Label(text="👤", font_size=dp(20), size_hint_x=0.2,
+        profile_btn = Label(text="PRF", font_size=dp(20), size_hint_x=0.2,
                             halign="right")
         profile_btn.bind(size=profile_btn.setter("text_size"))
         logo_row.add_widget(logo_lbl)
@@ -132,29 +113,6 @@ class BaseScreen(Screen):
         self._header_bg.pos  = widget.pos
         self._header_bg.size = widget.size
 
-    def _build_nav(self):
-        nav = BottomNav(active=self.active_nav(),
-                        screen_manager=self.manager)
-        nav.size_hint_y = None
-        nav.height = self.NAV_HEIGHT
-        self._main.add_widget(nav)
-        # Keep reference so we can pass manager after it's set
-        self._nav = nav
-
-    def _build_fab(self):
-        fab = RoundedButton(
-            text="+",
-            bg_color=Colors.ORANGE,
-            radius=dp(26),
-            size_hint=(None, None),
-            size=(self.FAB_SIZE, self.FAB_SIZE),
-            pos_hint={"center_x": 0.5},
-            font_size=dp(26),
-        )
-        fab.pos_hint = {"center_x": 0.5, "top": 0.12}  # adjust 0.12 to move up/down
-        fab.bind(on_release=self._on_fab)
-        self._root.add_widget(fab)
-        self._fab = fab
 
     def _on_fab(self, *_):
         self.app.shipment_service.new_shipment()
@@ -176,3 +134,55 @@ class BaseScreen(Screen):
     @property
     def app(self):
         return App.get_running_app()
+
+    def _build_login(self):
+        login_window = BoxLayout(
+            orientation="vertical",
+            spacing=dp(12),
+            size_hint=(0.8, None),
+            height=dp(200),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+            padding=[0, Window.height * 0.4],
+        )
+
+        label = ZippyLabel(
+            text="Prihlasovanie",
+            color=Colors.BLUE,
+            font_size=dp(20),
+            size_hint_y=None,
+            height=dp(40),
+        )
+
+        self.email = ZippyInput(hint_text="Email", size_hint_x=1)
+        self.password = ZippyInput(hint_text="Heslo", size_hint_x=1, password=True)
+
+        login_btn = RoundedButton(
+            text="Prihlásiť sa",
+            bg_color=Colors.ORANGE,
+            size_hint_y=None,
+            height=dp(44),
+        )
+
+        login_btn.bind(on_press=self._on_login_verify)
+
+        self.error_label = ZippyLabel(text="", color=(1, 0, 0, 1), size_hint_y=None, height=dp(24))
+
+        login_window.add_widget(label)
+        login_window.add_widget(self.email)
+        login_window.add_widget(self.password)
+        login_window.add_widget(login_btn)
+
+        self.content_area.add_widget(login_window)
+        return login_window
+
+    def _on_login_verify(self, *_):
+        result = AuthService().login(self.email.text, self.password.text)
+
+        if not result["success"]:
+            self.error_label.text = result["error"]
+            return
+
+        if result["role"] == "customer":
+            self.go_to("home")
+        elif result["role"] == "courier":
+            self.go_to("courier_home")

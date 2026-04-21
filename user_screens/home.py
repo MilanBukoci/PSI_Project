@@ -1,5 +1,5 @@
 """
-screens/home.py – Home / Domov screen.
+user_screens/home.py – Home / Domov screen.
 
 Shows the tagline, quick-action grid, and active shipments.
 Other UCs register their quick-action cards via HomeScreen.register_action().
@@ -12,7 +12,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.metrics import dp
 
-from screens.base_screen import BaseScreen
+from user_screens.base_screen import BaseScreen
 from theme import Colors, RoundedButton, make_label
 
 

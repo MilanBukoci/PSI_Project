@@ -76,6 +76,10 @@ class ZippyInput(TextInput):
         kwargs.setdefault("height", dp(40))
         super().__init__(**kwargs)
 
+# --styled label--------------
+class ZippyLabel(Label):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 # ── Step indicator ────────────────────────────────────────────────────────────
 class _StepCircle(Widget):
