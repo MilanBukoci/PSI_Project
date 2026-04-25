@@ -182,7 +182,14 @@ class LoginScreen(Screen):
             self.error_label.text = result["error"]
             return
 
+        app = App.get_running_app()
+        app.user_role = result["role"]
+
         if result["role"] == "customer":
             self.go_to("home")
         elif result["role"] == "courier":
+            app.uc04_service.set_courier(
+                courier_id=result["id"],
+                name=result["name"],
+            )
             self.go_to("uc04_list")

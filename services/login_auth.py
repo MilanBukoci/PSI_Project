@@ -3,8 +3,8 @@
 MOCK_USERS = [
     {"email": "customer1@test.com", "password": "1234", "role": "customer", "name": "Jana Nováková"},
     {"email": "customer2@test.com", "password": "1234", "role": "customer", "name": "Peter Horváth"},
-    {"email": "courier1@test.com",  "password": "1234", "role": "courier",  "name": "Marek Sloboda"},
-    {"email": "courier2@test.com",  "password": "1234", "role": "courier",  "name": "Tomáš Kováč"},
+    {"email": "courier1@test.com",  "password": "1234", "role": "courier",  "name": "Marek Sloboda", "id": "123456"},
+    {"email": "courier2@test.com",  "password": "1234", "role": "courier",  "name": "Tomáš Kováč", "id": "654321"},
 ]
 
 class AuthService:
@@ -23,7 +23,7 @@ class AuthService:
             return {"success": False, "error": "Nesprávne heslo"}
 
         self.current_user = user
-        return {"success": True, "role": user["role"], "name": user["name"]}
+        return {"success": True, "role": user["role"], "name": user["name"], "id": user.get("id", "")}
 
     def logout(self):
         self.current_user = None

@@ -5,6 +5,8 @@ Uses mock/hardcoded data until a real backend is connected.
 
 import logging
 
+from models.courier import Courier
+
 log = logging.getLogger(__name__)
 
 
@@ -81,7 +83,6 @@ MOCK_ROUTE_ORDER = [
     "...",
 ]
 
-
 class UC04DeliveryService:
     """Handles courier delivery workflow for UC04."""
 
@@ -91,6 +92,7 @@ class UC04DeliveryService:
         self._picked_up = False          # True after pickup confirmed
         self._current_index = 0          # which stop we're on
         self._unavailable_counts: dict[str, int] = {}   # shipment_id -> attempts
+        self._courier: Courier | None = None
 
     # ── Shipment list ─────────────────────────────────────────────────────────
 
@@ -102,6 +104,20 @@ class UC04DeliveryService:
             if s["id"] == shipment_id:
                 return s
         return None
+
+    # ── Courier ───────────────────────────────────────────────────────────────
+
+    def set_courier(self, courier_id: str, name: str) -> None:
+        """Zavolá sa pri prihlásení kuriéra."""
+        self._courier = Courier(
+            id=courier_id,
+            name=name,
+            is_available=False,  # už pracuje
+            current_load=len(self._shipments),
+        )
+
+    def get_courier(self) -> Courier | None:
+        return self._courier
 
     # ── Pickup ────────────────────────────────────────────────────────────────
 
@@ -126,6 +142,7 @@ class UC04DeliveryService:
         shipment = self.get_shipment_by_id(shipment_id)
         if shipment and shipment["pin"] == pin.strip():
             shipment["status"] = "Doručené"
+            self._update_courier_load()
             log.info("UC04: %s delivered via PIN", shipment_id)
             return True
         log.warning("UC04: Wrong PIN for %s", shipment_id)
@@ -136,6 +153,7 @@ class UC04DeliveryService:
         shipment = self.get_shipment_by_id(shipment_id)
         if shipment:
             shipment["status"] = "Doručené"
+            self._update_courier_load()
             log.info("UC04: %s delivered via signature", shipment_id)
 
     # ── Unavailable customer ──────────────────────────────────────────────────
@@ -150,6 +168,8 @@ class UC04DeliveryService:
         shipment = self.get_shipment_by_id(shipment_id)
         if shipment:
             shipment["status"] = "Nedostupný" if count == 1 else "Vrátenie"
+            if count >= 2:
+                self._update_courier_load()
         log.info("UC04: %s unavailable (attempt %d)", shipment_id, count)
         return count
 
@@ -160,3 +180,14 @@ class UC04DeliveryService:
 
     def get_route_stops(self) -> list[str]:
         return MOCK_ROUTE_ORDER
+
+    # ── Helper ────────────────────────────────────────────────────────────────
+
+    def _update_courier_load(self) -> None:
+        """Aktualizuje current_load a is_available podľa stavu zásielok."""
+        if not self._courier:
+            return
+        pending = [s for s in self._shipments
+                   if s["status"] not in ("Doručené", "Vrátenie")]
+        self._courier.current_load = len(pending)
+        self._courier.is_available = len(pending) == 0
