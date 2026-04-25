@@ -16,7 +16,7 @@ from kivy.app import App
 from kivy.uix.widget import Widget
 
 from theme import Colors, RoundedButton
-from user_screens.base_screen import BaseScreen
+from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class SimpleMapWidget(Widget):
@@ -78,6 +78,16 @@ class UC04RouteScreen(BaseScreen):
     def build_content(self):
         ca = self.content_area
 
+        # Back button at the top
+        back_btn = RoundedButton(
+            text="<< Späť",
+            bg_color=Colors.MID_GRAY,
+            size_hint=(None, None),
+            size=(dp(90), dp(32)),
+        )
+        back_btn.bind(on_release=lambda *_: self.go_to("uc04_list", "right"))
+        ca.add_widget(back_btn)
+
         ca.add_widget(Label(
             text="[b]Trasa[/b]",
             markup=True,
@@ -122,7 +132,7 @@ class UC04RouteScreen(BaseScreen):
         ca.add_widget(Label(size_hint_y=1))
 
         next_btn = RoundedButton(
-            text="Ďalej →",
+            text="Ďalej ->",
             bg_color=Colors.ORANGE,
             size_hint_y=None,
             height=dp(48),
@@ -134,13 +144,17 @@ class UC04RouteScreen(BaseScreen):
         # Navigate to first undelivered shipment
         app = App.get_running_app()
         shipments = app.uc04_service.get_today_shipments()
-        pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie")]
+        pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie", "Nedostupný")]
         if pending:
             app.uc04_selected_id = pending[0]["id"]
             self.go_to("uc04_detail")
         else:
-            self.go_to("uc04_list", "right")
-
+            pending_nedostupne = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie")]
+            if pending_nedostupne:
+                app.uc04_selected_id = pending_nedostupne[0]["id"]
+                self.go_to("uc04_detail")
+            else:
+                self.go_to("uc04_list", "right")
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  uc04_detail.py  (in same file for brevity — split if preferred)
@@ -177,7 +191,7 @@ class UC04DetailScreen(BaseScreen):
         # Back button row
         back_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(36))
         back_btn = RoundedButton(
-            text="← Späť",
+            text="<< Späť",
             bg_color=Colors.MID_GRAY,
             size_hint=(None, None),
             size=(dp(90), dp(32)),
@@ -223,7 +237,7 @@ class UC04DetailScreen(BaseScreen):
 
         # Action buttons
         call_btn = RoundedButton(
-            text="📞  Zavolať zákazníkovi",
+            text="Zavolať zákazníkovi",
             bg_color=Colors.BLUE,
             size_hint_y=None,
             height=dp(48),
@@ -232,7 +246,7 @@ class UC04DetailScreen(BaseScreen):
         ca.add_widget(call_btn)
 
         deliver_btn = RoundedButton(
-            text="✔  Potvrdiť doručenie",
+            text="Potvrdiť doručenie",
             bg_color=Colors.SUCCESS_GRN,
             size_hint_y=None,
             height=dp(48),
@@ -241,7 +255,7 @@ class UC04DetailScreen(BaseScreen):
         ca.add_widget(deliver_btn)
 
         unavail_btn = RoundedButton(
-            text="✖  Zákazník nedostupný",
+            text="Zákazník nedostupný",
             bg_color=Colors.ERROR_RED,
             size_hint_y=None,
             height=dp(48),
@@ -263,9 +277,9 @@ class UC04DetailScreen(BaseScreen):
 
     def _on_unavailable(self, shipment):
         app = App.get_running_app()
-        count = app.uc04_service.mark_unavailable(shipment["id"])
         app.uc04_selected_id = shipment["id"]
-        if count == 1:
+        count = app.uc04_service.get_unavailable_count(shipment["id"])
+        if count == 0:
             self.go_to("uc04_unavailable_1")
         else:
             self.go_to("uc04_unavailable_2")

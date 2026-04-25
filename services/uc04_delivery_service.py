@@ -59,6 +59,18 @@ MOCK_TODAY_SHIPMENTS = [
         "size": "XL",
         "pin": "3344",
     },
+    {
+        "id": "ZP-20260414-0005",
+        "address": "Trnava, Stará 2 ",
+        "recipient": "Ján Kováč",
+        "phone": "0901 123 456",
+        "status": "Na vyzdvihnutie",
+        "section": "B1",
+        "rack": "01",
+        "police": "05",
+        "size": "S",
+        "pin": "4783",
+    },
 ]
 
 # Optimised stop order for the route (indices into MOCK_TODAY_SHIPMENTS)
@@ -75,6 +87,7 @@ class UC04DeliveryService:
 
     def __init__(self):
         self._shipments = [dict(s) for s in MOCK_TODAY_SHIPMENTS]
+        self._pickup_index = 0
         self._picked_up = False          # True after pickup confirmed
         self._current_index = 0          # which stop we're on
         self._unavailable_counts: dict[str, int] = {}   # shipment_id -> attempts
@@ -92,12 +105,19 @@ class UC04DeliveryService:
 
     # ── Pickup ────────────────────────────────────────────────────────────────
 
-    def confirm_pickup(self) -> None:
-        """Courier confirmed pickup of all packages from warehouse."""
+    def confirm_pickup(self, index: int) -> None:
+        """Courier confirmed pickup of one package from warehouse."""
+        s = self._shipments[index]
+        s["status"] = "Vyzdvihnutá"
+
+    def all_picked_up(self) -> None:
+        """Courier started delivering."""
+
         self._picked_up = True
         for s in self._shipments:
-            s["status"] = "Na ceste"
-        log.info("UC04: Pickup confirmed, %d shipments", len(self._shipments))
+            if s["status"] == "Vyzdvihnutá":
+                s["status"] = "Na ceste"
+            log.info("UC04: Pickup confirmed, %d shipments", len(self._shipments))
 
     # ── Delivery ──────────────────────────────────────────────────────────────
 

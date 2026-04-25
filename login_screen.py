@@ -62,6 +62,11 @@ class LoginScreen(Screen):
     def active_nav(self) -> str:
         return "home"
 
+    def on_enter(self):
+        self.email.text = ""
+        self.password.text = ""
+        self.error_label.text = ""
+
     # ── Internal builders ─────────────────────────────────────────────────────
 
     def _build_header(self):
@@ -117,11 +122,6 @@ class LoginScreen(Screen):
     def _on_fab(self, *_):
         self.app.shipment_service.new_shipment()
         self.go_to("step1")
-
-    def on_enter(self):
-        """Update nav manager reference once screen is active."""
-        if hasattr(self, "_nav"):
-            self._nav.sm = self.manager
 
     # ── Navigation helpers ────────────────────────────────────────────────────
 

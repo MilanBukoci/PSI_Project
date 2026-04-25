@@ -5,13 +5,13 @@ Courier sees package details (section/rack/police/size) and confirms.
 
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
 from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
 from kivy.app import App
 
+
 from theme import Colors, RoundedButton
-from user_screens.base_screen import BaseScreen
+from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class InfoCard(BoxLayout):
@@ -104,7 +104,9 @@ class InfoCard(BoxLayout):
 
 
 class UC04PickupScreen(BaseScreen):
-    """Courier confirms picking up all packages from the warehouse."""
+    """Courier confirms pickup of each package one at a time."""
+
+    _current_index = 0
 
     def header_subtitle(self):
         return "COURIER SERVICES s.r.o."
@@ -112,8 +114,50 @@ class UC04PickupScreen(BaseScreen):
     def active_nav(self):
         return "uc04_list"
 
+    def on_enter(self):
+        super().on_enter()
+        self._shipments = App.get_running_app().uc04_service.get_today_shipments()
+        self._show_current()
+
     def build_content(self):
+        pass  # built dynamically in _show_current()
+
+    def _show_current(self):
         ca = self.content_area
+        ca.clear_widgets()
+
+        total = len(self._shipments)
+        idx = self._current_index
+
+        if idx >= total:
+            # All picked up — confirm all and proceed to route
+            App.get_running_app().uc04_service.all_picked_up()
+            self.go_to("uc04_route")
+            return
+
+        shipment = self._shipments[idx]
+
+        # Back button at the top
+        back_btn = RoundedButton(
+            text="<< Späť",
+            bg_color=Colors.MID_GRAY,
+            size_hint=(None, None),
+            size=(dp(90), dp(32)),
+        )
+        back_btn.bind(on_release=self._on_back)
+        ca.add_widget(back_btn)
+
+        # Progress indicator e.g. "Zásielka 2 / 4"
+        progress_lbl = Label(
+            text=f"Zásielka {self._current_index + 1} / {total}",
+            font_size=dp(13),
+            color=Colors.MID_GRAY,
+            size_hint_y=None,
+            height=dp(22),
+            halign="left",
+        )
+        progress_lbl.bind(size=progress_lbl.setter("text_size"))
+        ca.add_widget(progress_lbl)
 
         ca.add_widget(Label(
             text="[b]Vyzdvihnutie zásielky[/b]",
@@ -125,38 +169,23 @@ class UC04PickupScreen(BaseScreen):
             halign="left",
         ))
 
-        scroll = ScrollView(size_hint_y=1)
-        col = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None)
-        col.bind(minimum_height=col.setter("height"))
-
-        svc = App.get_running_app().uc04_service
-        for s in svc.get_today_shipments():
-            col.add_widget(InfoCard(shipment=s))
-
-        scroll.add_widget(col)
-        ca.add_widget(scroll)
-
-        btn_row = BoxLayout(orientation="horizontal", spacing=dp(12),
-                            size_hint_y=None, height=dp(48))
-
-        back_btn = RoundedButton(
-            text="← Späť",
-            bg_color=Colors.MID_GRAY,
-            size_hint_x=0.4,
-        )
-        back_btn.bind(on_release=lambda *_: self.go_to("uc04_list", "right"))
+        ca.add_widget(Label(size_hint_y=None, height=dp(12)))
+        ca.add_widget(InfoCard(shipment=shipment))
+        ca.add_widget(Label(size_hint_y=1))
 
         confirm_btn = RoundedButton(
             text="Potvrdiť vyzdvihnutie",
             bg_color=Colors.ORANGE,
-            size_hint_x=0.6,
+            size_hint_y=None,
+            height=dp(48),
         )
         confirm_btn.bind(on_release=self._on_confirm)
+        ca.add_widget(confirm_btn)
 
-        btn_row.add_widget(back_btn)
-        btn_row.add_widget(confirm_btn)
-        ca.add_widget(btn_row)
+    def _on_back(self, *_):
+        self.go_to("uc04_list", "right")
 
     def _on_confirm(self, *_):
-        App.get_running_app().uc04_service.confirm_pickup()
-        self.go_to("uc04_route")
+        App.get_running_app().uc04_service.confirm_pickup(self._current_index)
+        self._current_index += 1
+        self._show_current()

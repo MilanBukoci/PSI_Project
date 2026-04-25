@@ -16,7 +16,7 @@ from kivy.metrics import dp
 from kivy.app import App
 
 from theme import Colors, RoundedButton
-from user_screens.base_screen import BaseScreen
+from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class ShipmentListRow(BoxLayout):
@@ -101,6 +101,8 @@ class ShipmentListRow(BoxLayout):
             color = Colors.SUCCESS_GRN
         elif status in ("Vrátenie", "Nedostupný"):
             color = Colors.ERROR_RED
+        elif status in ("Vyzdvihnutá", "Na ceste"):
+            color = Colors.BLUE
         else:
             color = Colors.ORANGE
         w.canvas.before.clear()
@@ -166,16 +168,38 @@ class UC04ShipmentListScreen(BaseScreen):
         ca.add_widget(scroll)
 
         next_btn = RoundedButton(
-            text="Ďalej →",
+            text="Ďalej",
             bg_color=Colors.ORANGE,
             size_hint_y=None,
             height=dp(48),
         )
-        next_btn.bind(on_release=lambda *_: self.go_to("uc04_pickup"))
+        next_btn.bind(on_release=lambda *_: self._on_next())
         ca.add_widget(next_btn)
+
+        logout_btn = RoundedButton(
+            text="Odhlásiť sa",
+            bg_color=Colors.MID_GRAY,
+            size_hint_y=None,
+            height=dp(44),
+        )
+        logout_btn.bind(on_release=lambda *_: self.go_to("login", "right"))
+        ca.add_widget(logout_btn)
 
     def _on_shipment_tap(self, shipment: dict):
         """Tapping a row navigates to shipment detail."""
-        app = App.get_running_app()
+        """app = App.get_running_app()
         app.uc04_selected_id = shipment["id"]
-        self.go_to("uc04_detail")
+        if shipment["status"] == "Na vyzdvihnutie":
+            self.go_to("uc04_pickup")
+        elif shipment["status"] == "Na ceste":
+            self.go_to("uc04_detail")
+        """
+
+    def _on_next(self):
+        svc = App.get_running_app().uc04_service
+        shipments = svc.get_today_shipments()
+        all_picked_up = all(s["status"] != "Na vyzdvihnutie" for s in shipments)
+        if all_picked_up:
+            self.go_to("uc04_route")
+        else:
+            self.go_to("uc04_pickup")

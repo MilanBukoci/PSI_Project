@@ -16,7 +16,7 @@ from kivy.app import App
 
 
 from theme import Colors, RoundedButton, ZippyInput
-from user_screens.base_screen import BaseScreen
+from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class UC04ConfirmDeliveryScreen(BaseScreen):
@@ -31,21 +31,24 @@ class UC04ConfirmDeliveryScreen(BaseScreen):
     def active_nav(self):
         return "uc04_list"
 
+    def on_enter(self):
+        super().on_enter()
+        self._pin_input.text = ""
+        self._pin_error.text = ""
+        self._sig_input.text = ""
+
     def build_content(self):
         ca = self.content_area
 
-        # Back button
-        back_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(36))
+        # Back button at the top
         back_btn = RoundedButton(
-            text="← Späť",
+            text="<< Späť",
             bg_color=Colors.MID_GRAY,
             size_hint=(None, None),
             size=(dp(90), dp(32)),
         )
         back_btn.bind(on_release=lambda *_: self.go_to("uc04_detail", "right"))
-        back_row.add_widget(back_btn)
-        back_row.add_widget(Label())
-        ca.add_widget(back_row)
+        ca.add_widget(back_btn)  # spacer
 
         ca.add_widget(Label(
             text="[b]Potvrdenie prevzatia[/b]",
@@ -170,7 +173,7 @@ class UC04ConfirmDeliveryScreen(BaseScreen):
         """After successful delivery, go to next pending shipment or uc04_list."""
         app = App.get_running_app()
         shipments = app.uc04_service.get_today_shipments()
-        pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie")]
+        pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie", "Nedostupný")]
         if pending:
             app.uc04_selected_id = pending[0]["id"]
             self.go_to("uc04_detail")
@@ -197,7 +200,7 @@ class UC04Unavailable1Screen(BaseScreen):
         # Back button
         back_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(36))
         back_btn = RoundedButton(
-            text="← Späť",
+            text="<< Späť",
             bg_color=Colors.MID_GRAY,
             size_hint=(None, None),
             size=(dp(90), dp(32)),
@@ -261,6 +264,7 @@ class UC04Unavailable1Screen(BaseScreen):
 
     def _on_ok(self, *_):
         app = App.get_running_app()
+        app.uc04_service.mark_unavailable(app.uc04_selected_id)
         shipments = app.uc04_service.get_today_shipments()
         pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie", "Nedostupný")]
         if pending:
@@ -284,7 +288,7 @@ class UC04Unavailable2Screen(BaseScreen):
 
         back_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(36))
         back_btn = RoundedButton(
-            text="← Späť",
+            text="<< Späť",
             bg_color=Colors.MID_GRAY,
             size_hint=(None, None),
             size=(dp(90), dp(32)),
@@ -318,8 +322,18 @@ class UC04Unavailable2Screen(BaseScreen):
             size_hint_y=None,
             height=dp(48),
         )
-        ok_btn.bind(on_release=lambda *_: self.go_to("uc04_route"))
+        ok_btn.bind(on_release=lambda *_: self._on_ok())
         ca.add_widget(ok_btn)
+
+    def _on_ok(self, *_):
+        app = App.get_running_app()
+        app.uc04_service.mark_unavailable(app.uc04_selected_id)
+        shipments = app.uc04_service.get_today_shipments()
+        pending = [s for s in shipments if s["status"] not in ("Doručené", "Vrátenie")]
+        if pending:
+            self.go_to("uc04_route")
+        else:
+            self.go_to("uc04_list")
 
     def _info_card(self, message):
         card = BoxLayout(

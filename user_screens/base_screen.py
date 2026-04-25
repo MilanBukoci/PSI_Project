@@ -176,3 +176,13 @@ class BaseScreen(Screen):
     @property
     def app(self):
         return App.get_running_app()
+
+
+class CourierBaseScreen(BaseScreen):
+    """Base screen pre kuriérske obrazovky — bez nav baru a FAB."""
+
+    def _build_nav(self):
+        pass  # kuriér nemá bottom nav
+
+    def _build_fab(self):
+        pass
