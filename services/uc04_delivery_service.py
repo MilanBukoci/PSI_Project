@@ -4,78 +4,13 @@ Uses mock/hardcoded data until a real backend is connected.
 """
 
 import logging
-
+from datetime import date
 from models.courier import Courier
+from models.shipment import Shipment, PackageDetails, Address
 
 log = logging.getLogger(__name__)
 
-
-# ── Mock data ─────────────────────────────────────────────────────────────────
-
-MOCK_TODAY_SHIPMENTS = [
-    {
-        "id": "ZP-20260414-0001",
-        "address": "Trnava, Hlavná 5",
-        "recipient": "Ján Novák",
-        "phone": "0900 123 456",
-        "status": "Na vyzdvihnutie",
-        "section": "B1",
-        "rack": "01",
-        "police": "04",
-        "size": "L",
-        "pin": "4782",
-    },
-    {
-        "id": "ZP-20260414-0002",
-        "address": "Trnava, Nová 2",
-        "recipient": "Anna Kováč",
-        "phone": "0911 222 333",
-        "status": "Na vyzdvihnutie",
-        "section": "A2",
-        "rack": "03",
-        "police": "02",
-        "size": "M",
-        "pin": "1193",
-    },
-    {
-        "id": "ZP-20260414-0003",
-        "address": "Trnava, Stará 5",
-        "recipient": "Dávid Kováč",
-        "phone": "0944 555 777",
-        "status": "Na vyzdvihnutie",
-        "section": "C3",
-        "rack": "07",
-        "police": "01",
-        "size": "S",
-        "pin": "9021",
-    },
-    {
-        "id": "ZP-20260414-0004",
-        "address": "Trnava, Hlavná 5",
-        "recipient": "Marta Slobodová",
-        "phone": "0902 888 111",
-        "status": "Na vyzdvihnutie",
-        "section": "B1",
-        "rack": "02",
-        "police": "03",
-        "size": "XL",
-        "pin": "3344",
-    },
-    {
-        "id": "ZP-20260414-0005",
-        "address": "Trnava, Stará 2 ",
-        "recipient": "Ján Kováč",
-        "phone": "0901 123 456",
-        "status": "Na vyzdvihnutie",
-        "section": "B1",
-        "rack": "01",
-        "police": "05",
-        "size": "S",
-        "pin": "4783",
-    },
-]
-
-# Optimised stop order for the route (indices into MOCK_TODAY_SHIPMENTS)
+# ── Mock route order ──────────────────────────────────────────────────────────
 MOCK_ROUTE_ORDER = [
     "Hlavná 5",
     "Stará 5",
@@ -83,25 +18,109 @@ MOCK_ROUTE_ORDER = [
     "...",
 ]
 
+# ── Mock Shipment objects ─────────────────────────────────────────────────────
+def _make_mock_shipments() -> list[Shipment]:
+    return [
+        Shipment(
+            id="ZP-20260414-0001",
+            package=PackageDetails(size_x=30, size_y=20, size_z=15, weight=2.5, contents="Elektronika"),
+            sender=Address(first_name="Zippy", last_name="Sklad", street="Skladová 1", postal_code="91701"),
+            recipient=Address(first_name="Ján", last_name="Novák", street="Hlavná 5", postal_code="91701"),
+            status="Na vyzdvihnutie",
+            route="Sklad -> Trnava, Hlavná 5",
+            assigned_courier_id="123456",
+            delivery_date=date.today(),
+            pin="4782", phone="0900 123 456", section="B1", rack="01", police="04", size="L",
+        ),
+        Shipment(
+            id="ZP-20260414-0002",
+            package=PackageDetails(size_x=20, size_y=15, size_z=10, weight=1.2, contents="Oblečenie"),
+            sender=Address(first_name="Zippy", last_name="Sklad", street="Skladová 1", postal_code="91701"),
+            recipient=Address(first_name="Anna", last_name="Kováč", street="Nová 2", postal_code="91701"),
+            status="Na vyzdvihnutie",
+            route="Sklad -> Trnava, Nová 2",
+            assigned_courier_id="123456",
+            delivery_date=date.today(),
+            section="A2", rack="03", police="02", size="M", phone="0911 222 333", pin="1193",
+        ),
+        Shipment(
+            id="ZP-20260414-0003",
+            package=PackageDetails(size_x=10, size_y=10, size_z=5, weight=0.5, contents="Knihy"),
+            sender=Address(first_name="Zippy", last_name="Sklad", street="Skladová 1", postal_code="91701"),
+            recipient=Address(first_name="Dávid", last_name="Kováč", street="Stará 5", postal_code="91701"),
+            status="Na vyzdvihnutie",
+            route="Sklad -> Trnava, Stará 5",
+            assigned_courier_id="123456",
+            delivery_date=date.today(),
+            section="C3", rack="07", police="01", size="S", phone="0944 555 777", pin="9021",
+        ),
+        Shipment(
+            id="ZP-20260414-0004",
+            package=PackageDetails(size_x=50, size_y=40, size_z=30, weight=8.0, contents="Spotrebič"),
+            sender=Address(first_name="Zippy", last_name="Sklad", street="Skladová 1", postal_code="91701"),
+            recipient=Address(first_name="Marta", last_name="Slobodová", street="Hlavná 5", postal_code="91701"),
+            status="Na vyzdvihnutie",
+            route="Sklad -> Trnava, Hlavná 5",
+            assigned_courier_id="123456",
+            delivery_date=date.today(),
+            section="B1", rack="02", police="03", size="XL", phone="0902 888 111", pin="3344",
+        ),
+        Shipment(
+            id="ZP-20260414-0005",
+            package=PackageDetails(size_x=15, size_y=10, size_z=8, weight=0.8, contents="Kozmetika"),
+            sender=Address(first_name="Zippy", last_name="Sklad", street="Skladová 1", postal_code="91701"),
+            recipient=Address(first_name="Ján", last_name="Kováč", street="Stará 2", postal_code="91701"),
+            status="Na vyzdvihnutie",
+            route="Sklad -> Trnava, Stará 2",
+            assigned_courier_id="123456",
+            delivery_date=date.today(),
+            section="B1", rack="01", police="05", size="S", phone="0901 123 456", pin="4783",
+        ),
+]
+
+def _shipment_to_dict(s: Shipment) -> dict:
+    """Konvertuje Shipment objekt na dict pre screeny."""
+    return {
+        "id":        s.id,
+        "address":   f"{s.recipient.street}",
+        "recipient": f"{s.recipient.first_name} {s.recipient.last_name}",
+        "phone":     s.phone,
+        "status":    s.status,
+        "section":   s.section,
+        "rack":      s.rack,
+        "police":    s.police,
+        "size":      s.size,
+        "pin":       s.pin,
+    }
+
 class UC04DeliveryService:
     """Handles courier delivery workflow for UC04."""
 
     def __init__(self):
-        self._shipments = [dict(s) for s in MOCK_TODAY_SHIPMENTS]
-        self._pickup_index = 0
-        self._picked_up = False          # True after pickup confirmed
-        self._current_index = 0          # which stop we're on
+        self._shipments: list[Shipment] = _make_mock_shipments()
         self._unavailable_counts: dict[str, int] = {}   # shipment_id -> attempts
         self._courier: Courier | None = None
 
     # ── Shipment list ─────────────────────────────────────────────────────────
 
     def get_today_shipments(self) -> list[dict]:
-        return self._shipments
+        return [_shipment_to_dict(s) for s in self._shipments]
 
     def get_shipment_by_id(self, shipment_id: str) -> dict | None:
+        s = self._get_obj_by_id(shipment_id)
+        return _shipment_to_dict(s) if s else None
+
+    def get_shipment_obj_by_id(self, shipment_id: str) -> Shipment | None:
+        """Pre kolegov ktorí potrebujú priamy prístup k Shipment objektu."""
+        return self._get_obj_by_id(shipment_id)
+
+    def get_all_shipment_objs(self) -> list[Shipment]:
+        """Pre kolegov ktorí potrebujú priamy prístup k Shipment objektom."""
+        return self._shipments
+
+    def _get_obj_by_id(self, shipment_id: str) -> Shipment | None:
         for s in self._shipments:
-            if s["id"] == shipment_id:
+            if s.id == shipment_id:
                 return s
         return None
 
@@ -122,26 +141,20 @@ class UC04DeliveryService:
     # ── Pickup ────────────────────────────────────────────────────────────────
 
     def confirm_pickup(self, index: int) -> None:
-        """Courier confirmed pickup of one package from warehouse."""
-        s = self._shipments[index]
-        s["status"] = "Vyzdvihnutá"
+        self._shipments[index].status = "Vyzdvihnutá"
 
     def all_picked_up(self) -> None:
-        """Courier started delivering."""
-
-        self._picked_up = True
         for s in self._shipments:
-            if s["status"] == "Vyzdvihnutá":
-                s["status"] = "Na ceste"
-            log.info("UC04: Pickup confirmed, %d shipments", len(self._shipments))
+            if s.status == "Vyzdvihnutá":
+                s.status = "Na ceste"
+        log.info("UC04: All picked up, %d shipments", len(self._shipments))
 
     # ── Delivery ──────────────────────────────────────────────────────────────
 
     def confirm_delivery_pin(self, shipment_id: str, pin: str) -> bool:
-        """Returns True if PIN matches."""
-        shipment = self.get_shipment_by_id(shipment_id)
-        if shipment and shipment["pin"] == pin.strip():
-            shipment["status"] = "Doručené"
+        s = self._get_obj_by_id(shipment_id)
+        if s and s.pin == pin.strip():
+            s.status = "Doručené"
             self._update_courier_load()
             log.info("UC04: %s delivered via PIN", shipment_id)
             return True
@@ -149,32 +162,27 @@ class UC04DeliveryService:
         return False
 
     def confirm_delivery_signature(self, shipment_id: str) -> None:
-        """Signature was captured — mark as delivered."""
-        shipment = self.get_shipment_by_id(shipment_id)
-        if shipment:
-            shipment["status"] = "Doručené"
+        s = self._get_obj_by_id(shipment_id)
+        if s:
+            s.status = "Doručené"
             self._update_courier_load()
             log.info("UC04: %s delivered via signature", shipment_id)
 
     # ── Unavailable customer ──────────────────────────────────────────────────
 
+    def get_unavailable_count(self, shipment_id: str) -> int:
+        return self._unavailable_counts.get(shipment_id, 0)
+
     def mark_unavailable(self, shipment_id: str) -> int:
-        """
-        Increments unavailable counter.
-        Returns the new attempt count (1 = first miss, 2+ = return to depot).
-        """
         count = self._unavailable_counts.get(shipment_id, 0) + 1
         self._unavailable_counts[shipment_id] = count
-        shipment = self.get_shipment_by_id(shipment_id)
-        if shipment:
-            shipment["status"] = "Nedostupný" if count == 1 else "Vrátenie"
+        s = self._get_obj_by_id(shipment_id)
+        if s:
+            s.status = "Nedostupný" if count == 1 else "Vrátenie"
             if count >= 2:
                 self._update_courier_load()
         log.info("UC04: %s unavailable (attempt %d)", shipment_id, count)
         return count
-
-    def get_unavailable_count(self, shipment_id: str) -> int:
-        return self._unavailable_counts.get(shipment_id, 0)
 
     # ── Route ─────────────────────────────────────────────────────────────────
 
@@ -188,6 +196,6 @@ class UC04DeliveryService:
         if not self._courier:
             return
         pending = [s for s in self._shipments
-                   if s["status"] not in ("Doručené", "Vrátenie")]
+                   if s.status not in ("Doručené", "Vrátenie")]
         self._courier.current_load = len(pending)
         self._courier.is_available = len(pending) == 0

@@ -60,6 +60,8 @@ ScreenManager:
         name: 'uc04_route'
     UC04DetailScreen:
         name: 'uc04_detail'
+    UC04ShipmentInfoScreen:
+        name: 'uc04_shipment_info'
     UC04ConfirmDeliveryScreen:
         name: 'uc04_confirm'
     UC04Unavailable1Screen:

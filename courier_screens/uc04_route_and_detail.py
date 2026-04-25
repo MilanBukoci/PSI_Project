@@ -16,7 +16,7 @@ from kivy.app import App
 from kivy.uix.widget import Widget
 
 from theme import Colors, RoundedButton
-from user_screens.base_screen import CourierBaseScreen as BaseScreen
+from user_screens.base_screen import CourierBaseScreen as BaseScreen, CourierBaseScreen
 
 
 class SimpleMapWidget(Widget):
@@ -283,3 +283,139 @@ class UC04DetailScreen(BaseScreen):
             self.go_to("uc04_unavailable_1")
         else:
             self.go_to("uc04_unavailable_2")
+
+class UC04ShipmentInfoScreen(CourierBaseScreen):
+    """Zobrazí všetky detaily o zásielke zo shipment listu."""
+
+    def header_subtitle(self):
+        return "COURIER SERVICES s.r.o."
+
+    def active_nav(self):
+        return "uc04_list"
+
+    def on_enter(self):
+        super().on_enter()
+        self.content_area.clear_widgets()
+        self.build_content()
+
+    def build_content(self):
+        ca = self.content_area
+        app = App.get_running_app()
+        shipment_id = getattr(app, "uc04_selected_id", None)
+        shipment = app.uc04_service.get_shipment_by_id(shipment_id) if shipment_id else None
+
+        if not shipment:
+            ca.add_widget(Label(text="Zásielka nenájdená.", color=Colors.ERROR_RED))
+            return
+
+        # Back button
+        back_btn = RoundedButton(
+            text="<- Späť",
+            bg_color=Colors.MID_GRAY,
+            size_hint=(None, None),
+            size=(dp(90), dp(32)),
+        )
+        back_btn.bind(on_release=lambda *_: self.go_to("uc04_list", "right"))
+        ca.add_widget(back_btn)
+
+        ca.add_widget(Label(
+            text=f"[b]Zásielka {shipment['id']}[/b]",
+            markup=True,
+            font_size=dp(16),
+            color=Colors.DARK_TEXT,
+            size_hint_y=None,
+            height=dp(28),
+            halign="left",
+        ))
+
+        ca.add_widget(Label(size_hint_y=None, height=dp(8)))
+
+        # ── ScrollView pre sekcie ─────────────────────────────────────────────────
+        scroll = ScrollView(size_hint_y=1)
+        inner = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
+        inner.bind(minimum_height=inner.setter("height"))
+
+        # Info sekcie
+        self._add_section(inner, "Príjemca", [
+            ("Meno",     shipment["recipient"]),
+            ("Adresa",   shipment["address"]),
+            ("Telefón",  shipment["phone"]),
+        ])
+
+        # Získame Shipment objekt pre detailnejšie info
+        obj = app.uc04_service.get_shipment_obj_by_id(shipment_id)
+        if obj:
+            self._add_section(inner, "Odosielateľ", [
+                ("Meno",   f"{obj.sender.first_name} {obj.sender.last_name}"),
+                ("Adresa", f"{obj.sender.street}, {obj.sender.postal_code}"),
+            ])
+
+            self._add_section(inner, "Balík", [
+                ("Obsah",     obj.package.contents),
+                ("Rozmery",   f"{obj.package.size_x}x{obj.package.size_y}x{obj.package.size_z} cm"),
+                ("Hmotnosť",  f"{obj.package.weight} kg"),
+                ("Veľkosť",   shipment["size"]),
+                ("Inštrukcie", obj.package.special_instructions or "—"),
+            ])
+
+            self._add_section(inner, "Sklad", [
+                ("Sekcia",  shipment["section"]),
+                ("Regál",   shipment["rack"]),
+                ("Polica",  shipment["police"]),
+            ])
+
+            self._add_section(inner, "Doručenie", [
+                ("Status",        shipment["status"]),
+                ("Trasa",         obj.route),
+                ("Dátum",         str(obj.delivery_date or "—")),
+                ("Platba",        obj.payment_method),
+                ("Cena",          f"{obj.price:.2f} €"),
+            ])
+
+        scroll.add_widget(inner)
+        ca.add_widget(scroll)
+
+    def _add_section(self, ca, title, rows):
+        """Pridá sekciu s názvom a riadkami kľúč: hodnota."""
+        section = BoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            padding=[dp(12), dp(10)],
+            spacing=dp(4),
+        )
+        section.bind(minimum_height=section.setter("height"))
+
+        with section.canvas.before:
+            Color(*Colors.LIGHT_GRAY)
+            bg = RoundedRectangle(pos=section.pos, size=section.size, radius=[dp(10)])
+        section.bind(
+            pos=lambda w, *_: setattr(bg, "pos", w.pos),
+            size=lambda w, *_: setattr(bg, "size", w.size),
+        )
+
+        title_lbl = Label(
+            text=f"[b]{title}[/b]",
+            markup=True,
+            font_size=dp(13),
+            color=Colors.BLUE,
+            halign="left",
+            size_hint_y=None,
+            height=dp(22),
+        )
+        title_lbl.bind(size=title_lbl.setter("text_size"))
+        section.add_widget(title_lbl)
+
+        for key, val in rows:
+            row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(20))
+            k = Label(text=key, font_size=dp(12), color=Colors.MID_GRAY,
+                      halign="left", size_hint_x=0.4)
+            k.bind(size=k.setter("text_size"))
+            v = Label(text=str(val), font_size=dp(12), color=Colors.DARK_TEXT,
+                      halign="left", size_hint_x=0.6)
+            v.bind(size=v.setter("text_size"))
+            row.add_widget(k)
+            row.add_widget(v)
+            section.add_widget(row)
+
+        ca.add_widget(section)
+        ca.add_widget(Label(size_hint_y=None, height=dp(8)))

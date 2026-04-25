@@ -167,18 +167,21 @@ class UC04ShipmentListScreen(BaseScreen):
         scroll.add_widget(col)
         ca.add_widget(scroll)
 
-        next_btn = RoundedButton(
+        shipments = svc.get_today_shipments()
+        all_done = all(s["status"] in ("Doručené", "Vrátenie") for s in shipments)
+
+        self._next_btn = RoundedButton(
             text="Ďalej",
-            bg_color=Colors.ORANGE,
+            bg_color=Colors.MID_GRAY if all_done else Colors.ORANGE,
             size_hint_y=None,
             height=dp(48),
         )
-        next_btn.bind(on_release=lambda *_: self._on_next())
-        ca.add_widget(next_btn)
+        self._next_btn.bind(on_release=lambda *_: self._on_next())
+        ca.add_widget(self._next_btn)
 
         logout_btn = RoundedButton(
             text="Odhlásiť sa",
-            bg_color=Colors.MID_GRAY,
+            bg_color=Colors.ERROR_RED,
             size_hint_y=None,
             height=dp(44),
         )
@@ -187,17 +190,16 @@ class UC04ShipmentListScreen(BaseScreen):
 
     def _on_shipment_tap(self, shipment: dict):
         """Tapping a row navigates to shipment detail."""
-        """app = App.get_running_app()
+        app = App.get_running_app()
         app.uc04_selected_id = shipment["id"]
-        if shipment["status"] == "Na vyzdvihnutie":
-            self.go_to("uc04_pickup")
-        elif shipment["status"] == "Na ceste":
-            self.go_to("uc04_detail")
-        """
+        self.go_to("uc04_shipment_info")
 
     def _on_next(self):
         svc = App.get_running_app().uc04_service
         shipments = svc.get_today_shipments()
+        all_done = all(s["status"] in ("Doručené", "Vrátenie") for s in shipments)
+        if all_done:
+            return  # tlačidlo je sivé, nič sa nestane
         all_picked_up = all(s["status"] != "Na vyzdvihnutie" for s in shipments)
         if all_picked_up:
             self.go_to("uc04_route")

@@ -40,6 +40,14 @@ class Shipment:
     assigned_courier_id: str | None  = None
     delivery_date: date | None       = None
 
+    # ── UC04 courier delivery fields ──────────────────────────────────────────
+    pin: str = ""
+    phone: str = ""
+    section: str = ""
+    rack: str = ""
+    police: str = ""
+    size: str = ""
+
     def summary_lines(self):
         return [
             ("Rozmery",   f"{self.package.size_x}x{self.package.size_y}x{self.package.size_z} cm"),
