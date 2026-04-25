@@ -9,6 +9,7 @@ from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, SlideTransition
 
 import login_screen
+from services.uc04_delivery_service import UC04DeliveryService
 from user_screens.home import HomeScreen
 from user_screens.step1_package import Step1PackageScreen
 from user_screens.step2_addresses import Step2AddressesScreen
@@ -17,10 +18,17 @@ from user_screens.step4_confirm import Step4ConfirmScreen
 from services.socket_service import SocketService
 from services.shipment_service import ShipmentService
 
+from courier_screens.uc04_shipment_list import UC04ShipmentListScreen
+from courier_screens.uc04_pickup import UC04PickupScreen
+from courier_screens.uc04_route_and_detail import UC04RouteScreen
+from courier_screens.uc04_route_and_detail import UC04DetailScreen
+from courier_screens.uc04_confirm_and_unavailable import UC04ConfirmDeliveryScreen
+from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable1Screen
+from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable2Screen
+
 # ── Teammate screen imports go here ──────────────────────────────────────────
 # Tomáš  (UC01): from user_screens.uc01_redirect import UC01RedirectScreen
 # Adam   (UC02): from user_screens.uc02_assign  import UC02AssignScreen
-# Milan  (UC04): from user_screens.uc04_deliver import UC04DeliverScreen
 # Importing the screen file automatically registers it on HomeScreen.
 # -----------------------------------------------------------------------------
 
@@ -42,10 +50,25 @@ ScreenManager:
         name: 'step3'
     Step4ConfirmScreen:
         name: 'step4'
+        
+    # ── UC04 (Milan) ──────────────────────────────────────────────────────────
+    UC04ShipmentListScreen:
+        name: 'uc04_list'
+    UC04PickupScreen:
+        name: 'uc04_pickup'
+    UC04RouteScreen:
+        name: 'uc04_route'
+    UC04DetailScreen:
+        name: 'uc04_detail'
+    UC04ConfirmDeliveryScreen:
+        name: 'uc04_confirm'
+    UC04Unavailable1Screen:
+        name: 'uc04_unavailable_1'
+    UC04Unavailable2Screen:
+        name: 'uc04_unavailable_2'
 
     # Tomáš (UC01) — add: UC01RedirectScreen: / name: 'uc01_redirect'
     # Adam  (UC02) — add: UC02AssignScreen:   / name: 'uc02_assign'
-    # Milan (UC04) — add: UC04DeliverScreen:  / name: 'uc04_deliver'
 """
 
 class ZippyApp(App):
@@ -56,6 +79,9 @@ class ZippyApp(App):
 
         self.socket_service = SocketService()
         self.shipment_service = ShipmentService()
+        self.uc04_service = UC04DeliveryService()  # UC04
+        # uc04_selected_id stores which shipment is currently being delivered
+        self.uc04_selected_id: str | None = None
 
         self.socket_service.connect()
 

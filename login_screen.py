@@ -185,4 +185,4 @@ class LoginScreen(Screen):
         if result["role"] == "customer":
             self.go_to("home")
         elif result["role"] == "courier":
-            self.go_to("courier_home")
+            self.go_to("uc04_list")
