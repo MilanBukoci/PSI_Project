@@ -15,6 +15,11 @@ from user_screens.step1_package import Step1PackageScreen
 from user_screens.step2_addresses import Step2AddressesScreen
 from user_screens.step3_payment import Step3PaymentScreen
 from user_screens.step4_confirm import Step4ConfirmScreen
+from user_screens.uc01_redirect import (
+    UC01RedirectScreen,
+    UC01RedirectDetailScreen,
+)
+from user_screens.profile import ProfileScreen
 from services.socket_service import SocketService
 from services.shipment_service import ShipmentService
 
@@ -50,6 +55,8 @@ ScreenManager:
         name: 'step3'
     Step4ConfirmScreen:
         name: 'step4'
+    ProfileScreen:
+        name: 'profile'
         
     # ── UC04 (Milan) ──────────────────────────────────────────────────────────
     UC04ShipmentListScreen:
@@ -69,7 +76,10 @@ ScreenManager:
     UC04Unavailable2Screen:
         name: 'uc04_unavailable_2'
 
-    # Tomáš (UC01) — add: UC01RedirectScreen: / name: 'uc01_redirect'
+    UC01RedirectScreen:
+        name: 'uc01_redirect'
+    UC01RedirectDetailScreen:
+        name: 'uc01_detail'
     # Adam  (UC02) — add: UC02AssignScreen:   / name: 'uc02_assign'
 """
 
@@ -84,6 +94,9 @@ class ZippyApp(App):
         self.uc04_service = UC04DeliveryService()  # UC04
         # uc04_selected_id stores which shipment is currently being delivered
         self.uc04_selected_id: str | None = None
+        self.uc01_selected_id: str | None = None
+        self.uc01_return_screen: str = "uc01_redirect"
+        self.user_name: str = ""
 
         self.socket_service.connect()
 

@@ -43,10 +43,12 @@ class QuickActionCard(BoxLayout):
 
 
 class ShipmentRow(BoxLayout):
-    def __init__(self, shipment_id, route, status, dot_color, **kwargs):
+    def __init__(self, shipment_id, route, status, dot_color, on_tap=None, **kwargs):
         super().__init__(orientation="horizontal",
                          size_hint_y=None, height=dp(44),
                          padding=[dp(8), dp(4)], spacing=dp(8), **kwargs)
+        self.shipment_id = shipment_id
+        self._on_tap = on_tap
         with self.canvas.before:
             Color(*Colors.LIGHT_GRAY)
             self._bg = RoundedRectangle(pos=self.pos, size=self.size,
@@ -93,6 +95,12 @@ class ShipmentRow(BoxLayout):
             Color(*Colors.SUCCESS_GRN if "Na ceste" in w.text else Colors.ORANGE)
             RoundedRectangle(pos=w.pos, size=w.size, radius=[dp(8)])
 
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos) and self._on_tap:
+            self._on_tap(self.shipment_id)
+            return True
+        return super().on_touch_down(touch)
+
 
 class HomeScreen(BaseScreen):
     # ── Plugin registry ───────────────────────────────────────────────────────
@@ -101,7 +109,7 @@ class HomeScreen(BaseScreen):
     # UC03 (Ram) seeds the default — teammates append their own.
     _actions: list[tuple] = [
         ("", "Odoslať balík", "Vytvoriť objednávku", "step1"),
-        ("", "Sledovať", "Zadajte číslo", None),
+        ("", "Sledovať", "Zadajte číslo", "uc01_redirect"),
         ("", "Naplánovať", "Vyzdvihnutie", None),
         ("", "História", "Vaše zásielky", None),
     ]
@@ -177,6 +185,7 @@ class HomeScreen(BaseScreen):
                 route=s["route"],
                 status=s["status"],
                 dot_color=s["color"],
+                on_tap=self._on_active_shipment_tap,
             ))
 
         scroll.add_widget(shipments_col)
@@ -185,3 +194,11 @@ class HomeScreen(BaseScreen):
     def _on_card_touch(self, card, touch):
         if card.collide_point(*touch.pos) and card.target:
             self.go_to(card.target)
+
+    def _on_active_shipment_tap(self, shipment_id: str):
+        shipment = self.app.shipment_service.get_redirect_shipment(shipment_id)
+        if not shipment:
+            return
+        self.app.uc01_selected_id = shipment_id
+        self.app.uc01_return_screen = "home"
+        self.go_to("uc01_detail")

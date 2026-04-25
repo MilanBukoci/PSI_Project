@@ -171,9 +171,9 @@ class StepIndicator(BoxLayout):
 class BottomNav(BoxLayout):
     NAV_ITEMS = [
         ("Dom", "Domov", "home"),
-        ("Sle", "Sledovať", None),
+        ("Sle", "Sledovať", "uc01_redirect"),
         ("Nap", "Naplánovať", None),
-        ("Pro", "Profil", None),
+        ("Pro", "Profil", "profile"),
     ]
 
     def __init__(self, active="home", screen_manager=None, **kwargs):

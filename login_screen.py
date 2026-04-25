@@ -184,6 +184,7 @@ class LoginScreen(Screen):
 
         app = App.get_running_app()
         app.user_role = result["role"]
+        app.user_name = result["name"]
 
         if result["role"] == "customer":
             self.go_to("home")
