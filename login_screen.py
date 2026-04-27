@@ -194,3 +194,5 @@ class LoginScreen(Screen):
                 name=result["name"],
             )
             self.go_to("uc04_list")
+        elif result["role"] == "dispatcher":
+            self.go_to("uc02_shipment_list")

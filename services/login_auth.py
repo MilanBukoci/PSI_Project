@@ -5,6 +5,7 @@ MOCK_USERS = [
     {"email": "customer2@test.com", "password": "1234", "role": "customer", "name": "Peter Horváth"},
     {"email": "courier1@test.com",  "password": "1234", "role": "courier",  "name": "Marek Sloboda", "id": "123456"},
     {"email": "courier2@test.com",  "password": "1234", "role": "courier",  "name": "Tomáš Kováč", "id": "654321"},
+    {"email": "dispatcher1@test.com", "password": "1234", "role": "dispatcher", "name": "Adam Dispečer", "id": "D001"},
 ]
 
 class AuthService:

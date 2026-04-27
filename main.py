@@ -10,6 +10,7 @@ from kivy.uix.screenmanager import ScreenManager, SlideTransition
 
 import login_screen
 from services.uc04_delivery_service import UC04DeliveryService
+from services.uc02_dispatcher_service import UC02DispatcherService
 from user_screens.home import HomeScreen
 from user_screens.step1_package import Step1PackageScreen
 from user_screens.step2_addresses import Step2AddressesScreen
@@ -31,10 +32,12 @@ from courier_screens.uc04_confirm_and_unavailable import UC04ConfirmDeliveryScre
 from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable1Screen
 from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable2Screen
 
-# ── Teammate screen imports go here ──────────────────────────────────────────
-# Tomáš  (UC01): from user_screens.uc01_redirect import UC01RedirectScreen
-# Adam   (UC02): from user_screens.uc02_assign  import UC02AssignScreen
-# Importing the screen file automatically registers it on HomeScreen.
+# ── UC02 (Adam) ──────────────────────────────────────────────────────────────
+from dispatcher_screens.uc02_dispatcher import (
+    UC02ShipmentListScreen,
+    UC02CourierSelectScreen,
+    UC02ConfirmScreen,
+)
 # -----------------------------------------------------------------------------
 
 Window.size = (400, 700)
@@ -80,7 +83,13 @@ ScreenManager:
         name: 'uc01_redirect'
     UC01RedirectDetailScreen:
         name: 'uc01_detail'
-    # Adam  (UC02) — add: UC02AssignScreen:   / name: 'uc02_assign'
+    # ── UC02 (Adam) ──────────────────────────────────────────────────────────
+    UC02ShipmentListScreen:
+        name: 'uc02_shipment_list'
+    UC02CourierSelectScreen:
+        name: 'uc02_courier_select'
+    UC02ConfirmScreen:
+        name: 'uc02_confirm'
 """
 
 class ZippyApp(App):
@@ -92,10 +101,14 @@ class ZippyApp(App):
         self.socket_service = SocketService()
         self.shipment_service = ShipmentService()
         self.uc04_service = UC04DeliveryService()  # UC04
+        self.uc02_service = UC02DispatcherService()  # UC02
         # uc04_selected_id stores which shipment is currently being delivered
         self.uc04_selected_id: str | None = None
         self.uc01_selected_id: str | None = None
         self.uc01_return_screen: str = "uc01_redirect"
+        # UC02 dispatcher state
+        self.uc02_selected_shipments: list = []
+        self.uc02_selected_courier_id: str | None = None
         self.user_name: str = ""
 
         self.socket_service.connect()
