@@ -2,10 +2,13 @@
 theme.py – Zippy design tokens and reusable base widgets.
 """
 
+import os
+
 from kivy.uix.widget import Widget
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.image import Image
 from kivy.uix.textinput import TextInput
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.metrics import dp
@@ -170,10 +173,10 @@ class StepIndicator(BoxLayout):
 # ── Bottom nav bar ────────────────────────────────────────────────────────────
 class BottomNav(BoxLayout):
     NAV_ITEMS = [
-        ("Dom", "Domov", "home"),
-        ("Sle", "Sledovať", "uc01_redirect"),
-        ("Nap", "Naplánovať", None),
-        ("Pro", "Profil", "profile"),
+        ("home.png", "Domov", "home"),
+        ("search.png", "Sledovať", "uc01_redirect"),
+        ("plan.png", "Naplánovať", None),
+        ("user.png", "Profil", "profile"),
     ]
 
     def __init__(self, active="home", screen_manager=None, **kwargs):
@@ -206,18 +209,26 @@ class BottomNav(BoxLayout):
             btn = self._make_nav_btn(icon, label, target)
             self.add_widget(btn)
 
-    def _make_nav_btn(self, icon, label, target):
+    def _make_nav_btn(self, icon_file, label, target):
         col = BoxLayout(orientation="vertical", padding=[0, dp(4)])
         is_active = (target == self.active)
+        icon_path = os.path.join(os.path.dirname(__file__), "images", icon_file)
 
-        icon_lbl = Label(text=icon, font_size=dp(18))
+        icon_img = Image(
+            source=icon_path,
+            size_hint_y=None,
+            height=dp(20),
+            allow_stretch=True,
+            keep_ratio=True,
+            color=Colors.DARK_TEXT if is_active else Colors.MID_GRAY,
+        )
         text_lbl = Label(
             text=label,
             font_size=dp(10),
             color=Colors.DARK_TEXT if is_active else Colors.MID_GRAY,
             bold=is_active,
         )
-        col.add_widget(icon_lbl)
+        col.add_widget(icon_img)
         col.add_widget(text_lbl)
 
         def on_press(instance, t=target):

@@ -2,12 +2,15 @@
 user_screens/base_screen.py – Base class all Zippy user_screens inherit from.
 """
 
+import os
+
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
-from kivy.graphics import Color, Rectangle, RoundedRectangle
+from kivy.uix.image import Image
+from kivy.graphics import Color, Rectangle, RoundedRectangle, Line
 from kivy.metrics import dp
 from kivy.app import App
 
@@ -29,7 +32,7 @@ class BaseScreen(Screen):
 
     HEADER_HEIGHT = dp(80)
     NAV_HEIGHT    = dp(60)
-    FAB_SIZE      = dp(52)
+    FAB_SIZE      = dp(58)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -106,11 +109,19 @@ class BaseScreen(Screen):
             size_hint_x=0.8,
         )
         logo_lbl.bind(size=logo_lbl.setter("text_size"))
-        profile_btn = Label(text="👤", font_size=dp(20), size_hint_x=0.2,
-                            halign="right")
-        profile_btn.bind(size=profile_btn.setter("text_size"))
+        header_icon_path = os.path.join(os.path.dirname(__file__), "..", "images", "zippy_icon.png")
+        profile_btn = Image(
+            source=os.path.abspath(header_icon_path),
+            size_hint=(None, None),
+            size=(dp(70), dp(70)),
+            allow_stretch=True,
+            keep_ratio=True,
+        )
+        icon_wrap = FloatLayout(size_hint_x=0.28)
+        profile_btn.pos_hint = {"right": 0.98, "center_y": 0.36}
+        icon_wrap.add_widget(profile_btn)
         logo_row.add_widget(logo_lbl)
-        logo_row.add_widget(profile_btn)
+        logo_row.add_widget(icon_wrap)
         header.add_widget(logo_row)
 
         sub = self.header_subtitle()
@@ -143,18 +154,53 @@ class BaseScreen(Screen):
 
     def _build_fab(self):
         fab = RoundedButton(
-            text="+",
+            text="",
             bg_color=Colors.ORANGE,
-            radius=dp(26),
+            radius=dp(29),
             size_hint=(None, None),
             size=(self.FAB_SIZE, self.FAB_SIZE),
             pos_hint={"center_x": 0.5},
-            font_size=dp(26),
+            font_size=dp(32),
         )
-        fab.pos_hint = {"center_x": 0.5, "top": 0.12}  # adjust 0.12 to move up/down
+        fab.bold = True
+        fab.color = Colors.WHITE
+        fab.pos_hint = {"center_x": 0.5, "top": 0.118}  # adjust to move up/down
+        plus_icon_path = os.path.join(os.path.dirname(__file__), "..", "images", "plus.png")
+        plus_icon_path = os.path.abspath(plus_icon_path)
+        with fab.canvas.after:
+            Color(1, 1, 1, 0.9)
+            self._fab_outline = Line(rounded_rectangle=(fab.x, fab.y, fab.width, fab.height, dp(29)), width=dp(1.4))
+        self._fab_icon = Image(
+            source=plus_icon_path,
+            size_hint=(None, None),
+            size=(dp(22), dp(22)),
+            allow_stretch=True,
+            keep_ratio=True,
+        )
+        fab.add_widget(self._fab_icon)
+        fab.bind(pos=self._update_fab_outline, size=self._update_fab_outline)
+        fab.bind(pos=self._update_fab_icon, size=self._update_fab_icon)
         fab.bind(on_release=self._on_fab)
         self._root.add_widget(fab)
         self._fab = fab
+        self._update_fab_icon(fab)
+
+    def _update_fab_outline(self, widget, *_):
+        self._fab_outline.rounded_rectangle = (
+            widget.x,
+            widget.y,
+            widget.width,
+            widget.height,
+            dp(29),
+        )
+
+    def _update_fab_icon(self, widget, *_):
+        icon_size = dp(22)
+        self._fab_icon.size = (icon_size, icon_size)
+        self._fab_icon.pos = (
+            widget.x + (widget.width - icon_size) / 2,
+            widget.y + (widget.height - icon_size) / 2,
+        )
 
     def _on_fab(self, *_):
         self.app.shipment_service.new_shipment()

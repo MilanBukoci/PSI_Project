@@ -28,14 +28,17 @@ class QuickActionCard(BoxLayout):
                                         radius=[dp(10)])
         self.bind(pos=self._draw, size=self._draw)
 
-        self.add_widget(Label(text=icon, font_size=dp(20),
-                              size_hint_y=None, height=dp(28)))
-        self.add_widget(Label(text=title, font_size=dp(13), bold=True,
-                              color=Colors.DARK_TEXT,
-                              size_hint_y=None, height=dp(18)))
-        self.add_widget(Label(text=subtitle, font_size=dp(11),
-                              color=Colors.MID_GRAY,
-                              size_hint_y=None, height=dp(16)))
+        self._title_lbl = Label(
+            text=title,
+            font_size=dp(18),
+            bold=True,
+            color=Colors.DARK_TEXT,
+            halign="center",
+            valign="middle",
+            size_hint=(1, 1),
+        )
+        self._title_lbl.bind(size=self._title_lbl.setter("text_size"))
+        self.add_widget(self._title_lbl)
 
     def _draw(self, *_):
         self._bg.pos  = self.pos
