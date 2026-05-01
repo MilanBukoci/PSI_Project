@@ -37,6 +37,7 @@ class ShipmentService:
                 "depot_region": "KE",
                 "delivery_date": date.today() + timedelta(days=2),
                 "payment_status": "nezaplatená",
+                "amount_due": 4.99,
                 "pending_surcharge": 0.0,
             },
             "ZP-20260318-4412": {
@@ -48,6 +49,7 @@ class ShipmentService:
                 "depot_region": "ZA",
                 "delivery_date": date.today() + timedelta(days=3),
                 "payment_status": "nezaplatená",
+                "amount_due": 6.49,
                 "pending_surcharge": 0.0,
             },
             "ZP-20260420-1200": {
@@ -59,6 +61,7 @@ class ShipmentService:
                 "depot_region": "BA",
                 "delivery_date": date.today() - timedelta(days=1),
                 "payment_status": "zaplatená",
+                "amount_due": 0.0,
                 "pending_surcharge": 0.0,
             },
             "ZP-20260420-2201": {
@@ -70,6 +73,7 @@ class ShipmentService:
                 "depot_region": "TT",
                 "delivery_date": date.today(),
                 "payment_status": "nezaplatená",
+                "amount_due": 5.99,
                 "pending_surcharge": 0.0,
             },
         }
@@ -149,10 +153,10 @@ class ShipmentService:
 
     def can_redirect_shipment(self, shipment: dict) -> tuple[bool, str]:
         status = shipment.get("status", "")
+        if status == "Na ceste":
+            return False, "Zmena doručovacích informácií nieje možná, keď je balík už na ceste."
         if status == "Doručené":
             return False, "Zásielka je už doručená, presmerovanie nie je možné."
-        if status == "Doručuje sa":
-            return False, "Zásielka je práve doručovaná, skúste zmeniť dátum doručenia."
         return True, ""
 
     def evaluate_redirect_address(self, shipment: dict, new_postal_code: str) -> dict:
@@ -193,6 +197,12 @@ class ShipmentService:
         if not shipment:
             return {"ok": False, "message": "Zásielka neexistuje."}
 
+        can_redirect, message = self.can_redirect_shipment(shipment)
+        if not can_redirect:
+            return {"ok": False, "message": message}
+        if shipment.get("status") == "Doručuje sa":
+            return {"ok": False, "message": "Zásielka je práve doručovaná, adresu už nie je možné zmeniť."}
+
         check = self.evaluate_redirect_address(shipment, new_postal_code)
         if not check.get("ok"):
             return {"ok": False, "message": check.get("reason", "Presmerovanie sa nepodarilo.")}
@@ -215,16 +225,19 @@ class ShipmentService:
             "message": "Adresa doručenia bola úspešne zmenená.",
             "notify": shipment["last_redirect_note"],
             "surcharge": surcharge,
+            "notify_roles": ["customer", "dispatcher"] if surcharge > 0 else ["customer", "courier"],
         }
 
-    def validate_new_delivery_date(self, new_date: date | None) -> str | None:
+    def validate_new_delivery_date(self, new_date: date | None, reference_date: date | None = None) -> str | None:
         if new_date is None:
             return "Zadajte dátum doručenia."
 
         today = date.today()
-        max_allowed = today + timedelta(days=7)
-        if new_date < today:
+        baseline = reference_date if reference_date and reference_date > today else today
+        day_delta = (new_date - today).days
+        if day_delta < 0:
             return "Dátum doručenia nemôže byť v minulosti."
+        max_allowed = baseline + timedelta(days=7)
         if new_date > max_allowed:
             return "Dátum doručenia môže byť najviac o 7 dní."
         return None
@@ -234,7 +247,13 @@ class ShipmentService:
         if not shipment:
             return {"ok": False, "message": "Zásielka neexistuje."}
 
-        error = self.validate_new_delivery_date(new_date)
+        can_redirect, message = self.can_redirect_shipment(shipment)
+        if not can_redirect:
+            return {"ok": False, "message": message}
+        if shipment.get("status") == "Doručuje sa":
+            return {"ok": False, "message": "Zásielka je práve doručovaná, dátum už nie je možné zmeniť."}
+
+        error = self.validate_new_delivery_date(new_date, shipment.get("delivery_date"))
         if error:
             return {"ok": False, "message": error}
 
@@ -243,6 +262,7 @@ class ShipmentService:
             "ok": True,
             "message": "Dátum doručenia bol úspešne zmenený.",
             "notify": "Kuriér bol informovaný o zmene dátumu doručenia.",
+            "notify_roles": ["customer", "courier"],
         }
 
     def prepare_redirect_surcharge(self, shipment_id: str, surcharge: float) -> None:
@@ -258,7 +278,10 @@ class ShipmentService:
             return {"ok": False, "message": "Zásielka neexistuje."}
 
         amount = float(shipment.get("pending_surcharge", 0.0))
+        if amount <= 0:
+            amount = float(shipment.get("amount_due", 0.0))
         shipment["payment_status"] = "zaplatená"
+        shipment["amount_due"] = 0.0
         if amount > 0:
             shipment["pending_surcharge"] = 0.0
             return {"ok": True, "message": f"Poplatok {amount:.2f} EUR bol úspešne zaplatený."}

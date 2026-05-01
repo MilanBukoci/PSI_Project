@@ -106,19 +106,44 @@ class BaseScreen(Screen):
             font_size=dp(22),
             color=Colors.WHITE,
             halign="left",
-            size_hint_x=0.8,
+            size_hint_x=0.65,
         )
         logo_lbl.bind(size=logo_lbl.setter("text_size"))
         header_icon_path = os.path.join(os.path.dirname(__file__), "..", "images", "zippy_icon.png")
         profile_btn = Image(
             source=os.path.abspath(header_icon_path),
             size_hint=(None, None),
-            size=(dp(70), dp(70)),
+            size=(dp(56), dp(56)),
             allow_stretch=True,
             keep_ratio=True,
         )
-        icon_wrap = FloatLayout(size_hint_x=0.28)
-        profile_btn.pos_hint = {"right": 0.98, "center_y": 0.36}
+        notif_btn = Button(
+            text="",
+            size_hint=(None, None),
+            size=(dp(34), dp(34)),
+            background_normal="",
+            background_down="",
+            background_color=(1, 1, 1, 0.0),
+        )
+        notif_icon_path = os.path.join(os.path.dirname(__file__), "..", "images", "notification.png")
+        notif_icon = Image(
+            source=os.path.abspath(notif_icon_path),
+            size_hint=(None, None),
+            size=(dp(24), dp(24)),
+            allow_stretch=True,
+            keep_ratio=True,
+        )
+        notif_btn.add_widget(notif_icon)
+        notif_btn.bind(
+            pos=lambda w, *_: setattr(notif_icon, "pos", (w.x + (w.width - notif_icon.width) / 2, w.y + (w.height - notif_icon.height) / 2)),
+            size=lambda w, *_: setattr(notif_icon, "pos", (w.x + (w.width - notif_icon.width) / 2, w.y + (w.height - notif_icon.height) / 2)),
+        )
+        notif_btn.bind(on_release=self._on_notifications_press)
+
+        icon_wrap = FloatLayout(size_hint_x=0.35)
+        notif_btn.pos_hint = {"right": 0.52, "center_y": 0.36}
+        profile_btn.pos_hint = {"right": 1.0, "center_y": 0.36}
+        icon_wrap.add_widget(notif_btn)
         icon_wrap.add_widget(profile_btn)
         logo_row.add_widget(logo_lbl)
         logo_row.add_widget(icon_wrap)
@@ -205,6 +230,21 @@ class BaseScreen(Screen):
     def _on_fab(self, *_):
         self.app.shipment_service.new_shipment()
         self.go_to("step1")
+
+    def _on_notifications_press(self, *_):
+        if not self.manager:
+            return
+        role = getattr(self.app, "user_role", "")
+        if role == "courier" and self.manager.has_screen("uc04_notifications"):
+            self.app.uc04_return_screen = self.manager.current
+            self.go_to("uc04_notifications")
+            return
+        if role == "dispatcher" and self.manager.has_screen("uc02_notifications"):
+            self.app.uc02_return_screen = self.manager.current
+            self.go_to("uc02_notifications")
+            return
+        if self.manager.has_screen("notifications"):
+            self.go_to("notifications")
 
     def on_enter(self):
         """Update nav manager reference once screen is active."""

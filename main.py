@@ -21,8 +21,10 @@ from user_screens.uc01_redirect import (
     UC01RedirectDetailScreen,
 )
 from user_screens.profile import ProfileScreen
+from user_screens.notifications import NotificationsScreen
 from services.socket_service import SocketService
 from services.shipment_service import ShipmentService
+from services.notification_service import NotificationService
 
 from courier_screens.uc04_shipment_list import UC04ShipmentListScreen
 from courier_screens.uc04_pickup import UC04PickupScreen
@@ -31,6 +33,7 @@ from courier_screens.uc04_route_and_detail import UC04DetailScreen
 from courier_screens.uc04_confirm_and_unavailable import UC04ConfirmDeliveryScreen
 from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable1Screen
 from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable2Screen
+from courier_screens.uc04_notifications import UC04NotificationsScreen
 
 # ── UC02 (Adam) ──────────────────────────────────────────────────────────────
 from dispatcher_screens.uc02_dispatcher import (
@@ -38,6 +41,7 @@ from dispatcher_screens.uc02_dispatcher import (
     UC02CourierSelectScreen,
     UC02ConfirmScreen,
 )
+from dispatcher_screens.uc02_notifications import UC02NotificationsScreen
 # -----------------------------------------------------------------------------
 
 Window.size = (400, 700)
@@ -60,6 +64,8 @@ ScreenManager:
         name: 'step4'
     ProfileScreen:
         name: 'profile'
+    NotificationsScreen:
+        name: 'notifications'
         
     # ── UC04 (Milan) ──────────────────────────────────────────────────────────
     UC04ShipmentListScreen:
@@ -78,6 +84,8 @@ ScreenManager:
         name: 'uc04_unavailable_1'
     UC04Unavailable2Screen:
         name: 'uc04_unavailable_2'
+    UC04NotificationsScreen:
+        name: 'uc04_notifications'
 
     UC01RedirectScreen:
         name: 'uc01_redirect'
@@ -90,6 +98,8 @@ ScreenManager:
         name: 'uc02_courier_select'
     UC02ConfirmScreen:
         name: 'uc02_confirm'
+    UC02NotificationsScreen:
+        name: 'uc02_notifications'
 """
 
 class ZippyApp(App):
@@ -100,15 +110,18 @@ class ZippyApp(App):
 
         self.socket_service = SocketService()
         self.shipment_service = ShipmentService()
+        self.notification_service = NotificationService()
         self.uc04_service = UC04DeliveryService()  # UC04
         self.uc02_service = UC02DispatcherService()  # UC02
         # uc04_selected_id stores which shipment is currently being delivered
         self.uc04_selected_id: str | None = None
+        self.uc04_return_screen: str = "uc04_list"
         self.uc01_selected_id: str | None = None
         self.uc01_return_screen: str = "uc01_redirect"
         # UC02 dispatcher state
         self.uc02_selected_shipments: list = []
         self.uc02_selected_courier_id: str | None = None
+        self.uc02_return_screen: str = "uc02_shipment_list"
         self.user_name: str = ""
 
         self.socket_service.connect()

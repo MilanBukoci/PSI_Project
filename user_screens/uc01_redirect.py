@@ -119,6 +119,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
 
     def on_enter(self):
         super().on_enter()
+        self._pending_address_change: tuple[str, str] | None = None
         self._refresh_data()
 
     def build_content(self):
@@ -138,14 +139,15 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             font_size=dp(12),
             color=Colors.ERROR_RED,
             size_hint_y=None,
-            height=dp(24),
-            halign="left",
+            height=dp(44),
+            halign="center",
+            valign="middle",
         )
-        self.error_label.bind(size=self.error_label.setter("text_size"))
+        self.error_label.bind(size=lambda inst, _: setattr(inst, "text_size", (inst.width, None)))
 
         self.id_value = self._line_with_value("Číslo zásielky:")
-        self.address_value, _ = self._line_with_action("Adresa doručenia:", self._on_edit_address)
-        self.date_value, _ = self._line_with_action("Dátum doručenia:", self._on_edit_date)
+        self.address_value, self.address_btn = self._line_with_action("Adresa doručenia:", self._on_edit_address)
+        self.date_value, self.date_btn = self._line_with_action("Dátum doručenia:", self._on_edit_date)
         self.status_value = self._line_with_value("Stav zásielky:")
         self.payment_value, self.payment_btn = self._line_with_action(
             "Platba:",
@@ -153,8 +155,8 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             button_text="Zaplatiť",
         )
 
-        ca.add_widget(self.error_label)
         ca.add_widget(Label(size_hint_y=1))
+        ca.add_widget(self.error_label)
 
     def _line_with_value(self, title: str) -> Label:
         row = BoxLayout(orientation="vertical", spacing=dp(2), size_hint_y=None, height=dp(48))
@@ -194,19 +196,33 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         self.current_shipment = shipment
         can_redirect, message = self.app.shipment_service.can_redirect_shipment(shipment)
         self.error_label.text = "" if can_redirect else message
+        in_transit = shipment.get("status", "").strip().lower() == "na ceste"
 
         self.id_value.text = shipment["id"]
         self.address_value.text = f"{shipment['address']} ({shipment['postal_code']})"
         self.date_value.text = shipment["delivery_date"].strftime("%d.%m.%Y")
         self.status_value.text = shipment["status"]
+        if in_transit:
+            self.address_btn.disabled = True
+            self.address_btn.opacity = 0
+            self.address_btn.size = (0, dp(28))
+            self.date_btn.disabled = True
+            self.date_btn.opacity = 0
+            self.date_btn.size = (0, dp(28))
+        else:
+            self.address_btn.disabled = False
+            self.address_btn.opacity = 1
+            self.address_btn.size = (dp(74), dp(28))
+            self.date_btn.disabled = False
+            self.date_btn.opacity = 1
+            self.date_btn.size = (dp(74), dp(28))
 
         pending = shipment.get("pending_surcharge", 0.0)
+        amount_due = shipment.get("amount_due", 0.0)
         payment_status = shipment.get("payment_status", "nezaplatená")
         if payment_status != "zaplatená":
-            if pending > 0:
-                self.payment_value.text = f"nezaplatená ({pending:.2f} EUR)"
-            else:
-                self.payment_value.text = "nezaplatená"
+            payable_amount = float(pending) if pending > 0 else float(amount_due)
+            self.payment_value.text = f"nezaplatená ({payable_amount:.2f} EUR)"
             self.payment_btn.disabled = False
             self.payment_btn.opacity = 1
             self.payment_btn.size = (dp(74), dp(28))
@@ -224,6 +240,9 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         can_redirect, message = self.app.shipment_service.can_redirect_shipment(self.current_shipment)
         if not can_redirect:
             self.error_label.text = message
+            return
+        if self.current_shipment.get("status") == "Doručuje sa":
+            self.error_label.text = "Zásielka je práve doručovaná, adresu už nie je možné zmeniť."
             return
 
         content = BoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12))
@@ -260,6 +279,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             self.app.shipment_service.prepare_redirect_surcharge(self.current_shipment["id"], surcharge)
             popup.dismiss()
             if surcharge > 0:
+                self._pending_address_change = (new_address, new_postal)
                 self._message_popup(
                     "Vyžaduje sa platba",
                     f"Nová vzdialenosť: {evaluation['distance_km']} km\n"
@@ -293,10 +313,30 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             self.error_label.text = result["message"]
             return
 
+        for role in result.get("notify_roles", ["customer"]):
+            if role == "customer":
+                msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola úspešne zmenená."
+            elif role == "dispatcher":
+                msg = (
+                    f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola zmenená "
+                    "a bol vygenerovaný doplatok, je potrebné preplánovanie."
+                )
+            else:
+                msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola zmenená."
+            self.app.notification_service.push(role, msg)
+
         self._message_popup("Hotovo", "Zmena adresy úspešná")
         self._refresh_data()
 
     def _on_edit_date(self, *_):
+        can_redirect, message = self.app.shipment_service.can_redirect_shipment(self.current_shipment)
+        if not can_redirect:
+            self.error_label.text = message
+            return
+        if self.current_shipment.get("status") == "Doručuje sa":
+            self.error_label.text = "Zásielka je práve doručovaná, dátum už nie je možné zmeniť."
+            return
+
         content = BoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12))
         date_input = ZippyInput(hint_text="YYYY-MM-DD")
         content.add_widget(Label(text="Zadajte nový dátum", size_hint_y=None, height=dp(20)))
@@ -325,6 +365,12 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
                 return
 
             popup.dismiss()
+            for role in result.get("notify_roles", ["customer", "courier"]):
+                if role == "customer":
+                    msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – dátum doručenia bol úspešne zmenený."
+                else:
+                    msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – bol zmenený dátum doručenia."
+                self.app.notification_service.push(role, msg)
             self._message_popup("Hotovo", "Zmena dátumu úspešná")
             self._refresh_data()
 
@@ -335,6 +381,12 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         result = self.app.shipment_service.mark_redirect_payment_paid(self.current_shipment["id"])
         if not result["ok"]:
             self.error_label.text = result["message"]
+            return
+
+        if self._pending_address_change:
+            new_address, new_postal = self._pending_address_change
+            self._pending_address_change = None
+            self._apply_address_change(new_address, new_postal, surcharge_paid=True)
             return
 
         self._message_popup("Platba", "Poplatok úspešne zaplatený")
