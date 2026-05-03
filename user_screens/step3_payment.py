@@ -1,6 +1,6 @@
 """
-user_screens/step3_payment.py – Step 3: Order summary + payment method selection.
-Handles both the normal and payment-failed states.
+user_screens/step3_payment.py – Krok 3: Súhrn objednávky a výber platobnej metódy (UC03).
+Spracováva normálny stav aj stav zamietnutej platby.
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -22,6 +22,8 @@ PAYMENT_OPTIONS = [
 
 
 class PaymentOptionRow(BoxLayout):
+    """Jeden riadok platobnej metódy s rádiovou voľbou a popisom."""
+
     def __init__(self, key, icon, title, subtitle, selected=False, **kwargs):
         super().__init__(orientation="horizontal",
                          size_hint_y=None, height=dp(56),
@@ -32,7 +34,7 @@ class PaymentOptionRow(BoxLayout):
         self.bind(pos=lambda *_: self._draw_bg(),
                   size=lambda *_: self._draw_bg())
 
-        # Radio circle
+        # Rádiový indikátor výberu (kruh plný/prázdny)
         self._radio = Label(
             text="●" if selected else "○",
             font_size=dp(16),
@@ -41,8 +43,6 @@ class PaymentOptionRow(BoxLayout):
             size=(dp(24), dp(40)),
         )
 
-
-        # Text
         text_col = BoxLayout(orientation="vertical", spacing=dp(1))
         t_lbl = Label(text=title, font_size=dp(13), bold=True,
                       color=Colors.DARK_TEXT, halign="left")
@@ -66,6 +66,7 @@ class PaymentOptionRow(BoxLayout):
         self._draw_bg()
 
     def _draw_bg(self, *_):
+        # Vybraná metóda má modrasté pozadie, ostatné sivé
         self.canvas.before.clear()
         with self.canvas.before:
             if self._selected:
@@ -94,14 +95,14 @@ class Step3PaymentScreen(BaseScreen):
                           size_hint_y=None, padding=[0, dp(4)])
         inner.bind(minimum_height=inner.setter("height"))
 
-        # Summary section
+        # Súhrn — prázdny kontajner, vypĺňa sa v on_enter po príchode na obrazovku
         inner.add_widget(self._bold_label("SÚHRN"))
         self._summary_box = BoxLayout(orientation="vertical", size_hint_y=None,
                                       spacing=dp(4))
         self._summary_box.bind(minimum_height=self._summary_box.setter("height"))
         inner.add_widget(self._summary_box)
 
-        # Total
+        # Celková cena — aktualizuje sa v _rebuild_summary
         total_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(28))
         total_row.add_widget(self._bold_label("SPOLU"))
         self._price_lbl = Label(text="0.00 €", font_size=dp(16), bold=True,
@@ -110,12 +111,12 @@ class Step3PaymentScreen(BaseScreen):
         total_row.add_widget(self._price_lbl)
         inner.add_widget(total_row)
 
-        # Error banner (hidden by default)
+        # Chybový banner — skrytý kým platba neprejde zamietnutím
         self._error_banner = self._make_error_banner()
         self._error_banner.opacity = 0
         inner.add_widget(self._error_banner)
 
-        # Payment options
+        # Platobné metódy — predvolená je karta
         inner.add_widget(self._bold_label("Spôsob platby"))
         self._option_rows = {}
         for key, icon, title, subtitle in PAYMENT_OPTIONS:
@@ -137,6 +138,7 @@ class Step3PaymentScreen(BaseScreen):
         return lbl
 
     def _make_error_banner(self):
+        """Červený banner zobrazený po zamietnutí platby."""
         banner = BoxLayout(orientation="horizontal",
                            size_hint_y=None, height=dp(40),
                            padding=[dp(10), dp(6)])
@@ -161,6 +163,7 @@ class Step3PaymentScreen(BaseScreen):
         self._banner_bg.size = w.size
 
     def _on_option_touch(self, widget, touch):
+        # Odznačí všetky a označí dotknutú metódu; uloží výber do servisu
         if widget.collide_point(*touch.pos):
             for row in self._option_rows.values():
                 row.deselect()
@@ -183,11 +186,11 @@ class Step3PaymentScreen(BaseScreen):
         return row
 
     def _on_submit(self, *_):
-        # Toggle simulate_failure=True to test the error banner
+        # simulate_failure=True slúži na testovanie chybového bannera
         success = self.app.shipment_service.submit_shipment(simulate_failure=False)
 
         if success:
-            # Notify via socket stub
+            # Notifikácia cez socket stub a prechod na potvrdzovaciu obrazovku
             shipment = self.app.shipment_service.current_shipment
             self.app.socket_service.submit_shipment({"shipment_id": shipment.id})
             self.go_to("step4")
@@ -196,10 +199,11 @@ class Step3PaymentScreen(BaseScreen):
 
     def on_enter(self):
         super().on_enter()
-        # rebuild summary with fresh shipment data
+        # Súhrn sa prebuduje pri každom vstupe — zobrazí aktuálne dáta zo servisu
         self._rebuild_summary()
 
     def _rebuild_summary(self):
+        """Vymaže a znovu postaví riadky súhrnu z aktuálnej zásielky."""
         self._summary_box.clear_widgets()
         shipment = self.app.shipment_service.current_shipment
 

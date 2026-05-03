@@ -1,8 +1,8 @@
 """
-user_screens/home.py – Home / Domov screen.
+user_screens/home.py – Domovská obrazovka zákazníka.
 
-Shows the tagline, quick-action grid, and active shipments.
-Other UCs register their quick-action cards via HomeScreen.register_action().
+Zobrazuje tagline, mriežku rýchlych akcií a zoznam aktívnych zásielok.
+Ostatné UC registrujú svoje karty cez HomeScreen.register_action().
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -22,6 +22,7 @@ class QuickActionCard(BoxLayout):
                          spacing=dp(2), **kwargs)
         self.target = target
 
+        # Sivé zaoblené pozadie karty
         with self.canvas.before:
             Color(*Colors.MID_GRAY)
             self._bg = RoundedRectangle(pos=self.pos, size=self.size,
@@ -52,12 +53,15 @@ class ShipmentRow(BoxLayout):
                          padding=[dp(8), dp(4)], spacing=dp(8), **kwargs)
         self.shipment_id = shipment_id
         self._on_tap = on_tap
+
+        # Svetlosivé pozadie riadku zásielky
         with self.canvas.before:
             Color(*Colors.LIGHT_GRAY)
             self._bg = RoundedRectangle(pos=self.pos, size=self.size,
                                         radius=[dp(8)])
         self.bind(pos=self._draw, size=self._draw)
 
+        # Farebná bodka zodpovedá stavu zásielky
         dot = Label(text="o", font_size=dp(14),
                     color=dot_color, size_hint_x=None, width=dp(20))
         col = BoxLayout(orientation="vertical", spacing=dp(1))
@@ -70,6 +74,7 @@ class ShipmentRow(BoxLayout):
         col.add_widget(id_lbl)
         col.add_widget(route_lbl)
 
+        # Farebný odznak stavu (napr. „Na ceste", „Čaká")
         badge = Label(
             text=status,
             font_size=dp(10),
@@ -93,12 +98,14 @@ class ShipmentRow(BoxLayout):
         self._bg.size = self.size
 
     def _redraw_badge(self, w):
+        # Farba odznaku závisí od textu stavu — zelená pre „Na ceste", inak oranžová
         w.canvas.before.clear()
         with w.canvas.before:
             Color(*Colors.SUCCESS_GRN if "Na ceste" in w.text else Colors.ORANGE)
             RoundedRectangle(pos=w.pos, size=w.size, radius=[dp(8)])
 
     def on_touch_down(self, touch):
+        # Kliknutie na riadok otvorí detail zásielky cez UC01
         if self.collide_point(*touch.pos) and self._on_tap:
             self._on_tap(self.shipment_id)
             return True
@@ -106,10 +113,9 @@ class ShipmentRow(BoxLayout):
 
 
 class HomeScreen(BaseScreen):
-    # ── Plugin registry ───────────────────────────────────────────────────────
-    # Each UC registers its own quick-action card here.
-    # Format: (icon, title, subtitle, target_screen_name)
-    # UC03 (Ram) seeds the default — teammates append their own.
+    # ── Register rýchlych akcií ───────────────────────────────────────────────
+    # Každé UC môže pridať svoju kartu cez register_action().
+    # Formát: (icon, title, subtitle, target_screen_name)
     _actions: list[tuple] = [
         ("", "Odoslať balík", "Vytvoriť objednávku", "step1"),
         ("", "Sledovať", "Zadajte číslo", "uc01_redirect"),
@@ -118,23 +124,24 @@ class HomeScreen(BaseScreen):
 
     def on_enter(self):
         super().on_enter()
-        # Rebuild the shipments list every time home screen is shown
+        # Pri každom vstupe sa obsah prekreslí — zobrazí aktuálne zásielky
         self.content_area.clear_widgets()
         self.build_content()
 
     @classmethod
     def register_action(cls, icon: str, title: str, subtitle: str, target: str):
         """
-        Call this from your screen file to add a card to the home grid.
-        Example (put at module level in your screen file):
+        Registruje kartu rýchlej akcie do domovskej mriežky.
+        Volá sa na úrovni modulu v súbore príslušného UC.
+        Príklad:
             HomeScreen.register_action("", "Doručiť", "Zobraziť trasu", "uc04_deliver")
         """
-        # Avoid duplicates if module is reloaded
+        # Ochrana pred duplikátmi pri opätovnom načítaní modulu
         entry = (icon, title, subtitle, target)
         if entry not in cls._actions:
             cls._actions.append(entry)
 
-    # ── Screen ────────────────────────────────────────────────────────────────
+    # ── Obrazovka ─────────────────────────────────────────────────────────────
 
     def header_subtitle(self):
         return "COURIER SERVICES s.r.o."
@@ -145,7 +152,7 @@ class HomeScreen(BaseScreen):
     def build_content(self):
         ca = self.content_area
 
-        # Tagline
+        # Tagline v modrej farbe značky
         tagline = Label(
             text="[b][color=2b2bff]Kam dnes\nposielame balík?[/color][/b]",
             markup=True,
@@ -158,7 +165,7 @@ class HomeScreen(BaseScreen):
         tagline.bind(size=tagline.setter("text_size"))
         ca.add_widget(tagline)
 
-        # Quick-action grid — built from registry
+        # Mriežka rýchlych akcií — postavená z registra _actions
         grid = GridLayout(cols=2, spacing=dp(10),
                           size_hint_y=None, height=dp(130))
         for icon, title, subtitle, target in self._actions:
@@ -167,7 +174,7 @@ class HomeScreen(BaseScreen):
             grid.add_widget(card)
         ca.add_widget(grid)
 
-        # Active shipments
+        # Nadpis sekcie aktívnych zásielok
         ca.add_widget(Label(
             text="Aktívne zásielky",
             font_size=dp(14), bold=True,
@@ -176,6 +183,7 @@ class HomeScreen(BaseScreen):
             halign="left",
         ))
 
+        # Scrollovateľný zoznam zásielok z ShipmentService
         scroll = ScrollView(size_hint_y=1)
         shipments_col = BoxLayout(orientation="vertical", spacing=dp(8),
                                   size_hint_y=None)
@@ -194,10 +202,12 @@ class HomeScreen(BaseScreen):
         ca.add_widget(scroll)
 
     def _on_card_touch(self, card, touch):
+        # Navigácia na cieľovú obrazovku po kliknutí na kartu
         if card.collide_point(*touch.pos) and card.target:
             self.go_to(card.target)
 
     def _on_active_shipment_tap(self, shipment_id: str):
+        # Otvorí UC01 detail pre vybranú zásielku; uloží návratovú obrazovku
         shipment = self.app.shipment_service.get_redirect_shipment(shipment_id)
         if not shipment:
             return

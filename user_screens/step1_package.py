@@ -1,5 +1,5 @@
 """
-user_screens/step1_package.py – Step 1: Package dimensions & contents.
+user_screens/step1_package.py – Krok 1: Rozmery a obsah balíka (UC03).
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -21,37 +21,37 @@ class Step1PackageScreen(BaseScreen):
         return "home"
 
     def build_content(self):
-        # Lock step bar below header
+        # Indikátor krokov uzamknutý pod hlavičkou
         indicator = StepIndicator(current_step=1, size_hint_y=None, height=dp(54))
         self.step_bar.height = dp(54)
         self.step_bar.add_widget(indicator)
 
-        # Rest goes into content_area as normal
         ca = self.content_area
         ca.add_widget(self._section_label("Rozmery"))
 
+        # Pomocný label s jednotkou cm za každým poľom
         def unit_label():
-            return ZippyLabel(text="cm", font_size=dp(13),color=Colors.DARK_TEXT, size_hint_x=0.1)
+            return ZippyLabel(text="cm", font_size=dp(13), color=Colors.DARK_TEXT, size_hint_x=0.1)
 
+        # Mriežka 6 stĺpcov: pole X, cm, pole Y, cm, pole Z, cm
         size_row = GridLayout(cols=6, spacing=dp(8),
                               size_hint_y=None, height=dp(40))
-        self.inp_x = ZippyInput(hint_text="X",input_filter="int")
-        self.inp_y = ZippyInput(hint_text="Y",input_filter="int")
-        self.inp_z = ZippyInput(hint_text="Z",input_filter="int")
+        self.inp_x = ZippyInput(hint_text="X", input_filter="int")
+        self.inp_y = ZippyInput(hint_text="Y", input_filter="int")
+        self.inp_z = ZippyInput(hint_text="Z", input_filter="int")
         size_row.add_widget(self.inp_x)
         size_row.add_widget(unit_label())
         size_row.add_widget(self.inp_y)
         size_row.add_widget(unit_label())
         size_row.add_widget(self.inp_z)
         size_row.add_widget(unit_label())
-
         ca.add_widget(size_row)
 
-        # Hmotnosť
+        # Hmotnosť — max 40 kg podľa validácie
         ca.add_widget(self._section_label("Hmotnosť"))
         weight_row = BoxLayout(orientation="horizontal", spacing=dp(6),
                                size_hint_y=None, height=dp(40))
-        self.inp_weight = ZippyInput(hint_text="max: 40",input_filter="int")
+        self.inp_weight = ZippyInput(hint_text="max: 40", input_filter="int")
         kg_lbl = Label(text="KG", font_size=dp(13), bold=True,
                        color=Colors.DARK_TEXT,
                        size_hint=(None, None), size=(dp(30), dp(40)))
@@ -59,12 +59,12 @@ class Step1PackageScreen(BaseScreen):
         weight_row.add_widget(kg_lbl)
         ca.add_widget(weight_row)
 
-        # Obsah (optional)
+        # Obsah balíka — voliteľné pole
         ca.add_widget(self._section_label("Obsah"))
         self.inp_contents = ZippyInput(hint_text="")
         ca.add_widget(self.inp_contents)
 
-        # Špeciálne inštrukcie (optional)
+        # Špeciálne inštrukcie — voliteľné viacriadkové pole
         ca.add_widget(self._section_label("Špeciálne inštrukcie"))
         from kivy.uix.textinput import TextInput
         self.inp_instructions = TextInput(
@@ -78,10 +78,7 @@ class Step1PackageScreen(BaseScreen):
         )
         ca.add_widget(self.inp_instructions)
 
-        # Spacer
         ca.add_widget(Label(size_hint_y=1))
-
-        # Nav buttons
         ca.add_widget(self._nav_buttons())
 
     def _section_label(self, text):
@@ -114,14 +111,10 @@ class Step1PackageScreen(BaseScreen):
         )
         next_btn.bind(on_release=self._on_next)
 
-        container = BoxLayout(
-        orientation="vertical",
-        spacing=dp(12),
-        )
-
-        self.lbl_error = ZippyLabel(text="", color=get_color_from_hex("#FF0000"), padding=[dp(10), dp(8)])
-
-
+        container = BoxLayout(orientation="vertical", spacing=dp(12))
+        # Chybová hláška validácie — skrytá kým nie je chyba
+        self.lbl_error = ZippyLabel(text="", color=get_color_from_hex("#FF0000"),
+                                    padding=[dp(10), dp(8)])
         row.add_widget(back_btn)
         row.add_widget(next_btn)
         container.add_widget(self.lbl_error)
@@ -129,6 +122,7 @@ class Step1PackageScreen(BaseScreen):
         return container
 
     def _on_next(self, *_):
+        # Validácia vstupov pred uložením — chyba sa zobrazí inline
         error = validate_package(
             self.inp_x.text, self.inp_y.text,
             self.inp_z.text, self.inp_weight.text
@@ -138,6 +132,7 @@ class Step1PackageScreen(BaseScreen):
             return
 
         self.lbl_error.text = ""
+        # Uloženie do ShipmentService a prechod na krok 2
         self.app.shipment_service.save_package_details(
             x=int(self.inp_x.text),
             y=int(self.inp_y.text),

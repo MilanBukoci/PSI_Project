@@ -1,5 +1,5 @@
 """
-user_screens/step2_addresses.py – Step 2: Sender and recipient addresses.
+user_screens/step2_addresses.py – Krok 2: Adresy odosielateľa a príjemcu (UC03).
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -14,18 +14,18 @@ from theme import Colors, StepIndicator, RoundedButton, ZippyInput
 
 
 class AddressColumn(BoxLayout):
-    """One column (Odosielateľ or Príjemca) with its fields."""
+    """Jeden stĺpec adresy (Odosielateľ alebo Príjemca) so štyrmi poľami."""
 
     def __init__(self, title, bg_color, **kwargs):
         super().__init__(orientation="vertical", spacing=dp(6),
                          padding=[dp(8), dp(8)], **kwargs)
+        # Farebné pozadie stĺpca — oranžové pre odosielateľa, sivé pre príjemcu
         with self.canvas.before:
             Color(*bg_color)
             self._bg = RoundedRectangle(pos=self.pos, size=self.size,
                                         radius=[dp(10)])
         self.bind(pos=self._draw, size=self._draw)
 
-        # Title
         title_lbl = Label(
             text=f"[b]{title}[/b]",
             markup=True,
@@ -42,6 +42,7 @@ class AddressColumn(BoxLayout):
         self.inp_psc    = self._field("PSČ")
 
     def _field(self, hint):
+        # Každé pole má label nad sebou a ZippyInput pod ním
         lbl = Label(text=hint, font_size=dp(11), color=Colors.DARK_TEXT,
                     size_hint_y=None, height=dp(16), halign="left")
         lbl.bind(size=lbl.setter("text_size"))
@@ -55,6 +56,7 @@ class AddressColumn(BoxLayout):
         self._bg.size = self.size
 
     def get_data(self):
+        """Vráti slovník s hodnotami polí na uloženie do ShipmentService."""
         return {
             "first_name":  self.inp_first.text,
             "last_name":   self.inp_last.text,
@@ -72,7 +74,6 @@ class Step2AddressesScreen(BaseScreen):
 
     def build_content(self):
         ca = self.content_area
-
         ca.add_widget(StepIndicator(current_step=2,
                                     size_hint_y=None, height=dp(54)))
 
@@ -81,13 +82,12 @@ class Step2AddressesScreen(BaseScreen):
                           size_hint_y=None, padding=[0, dp(4)])
         inner.bind(minimum_height=inner.setter("height"))
 
-        # Two-column address layout
+        # Dvojstĺpcové rozloženie: odosielateľ vľavo, príjemca vpravo
         cols = BoxLayout(orientation="horizontal", spacing=dp(10),
                          size_hint_y=None, height=dp(310))
-
-        self.sender_col    = AddressColumn(
+        self.sender_col = AddressColumn(
             "ODOSIELATEĽ",
-            bg_color=(0.996, 0.851, 0.502, 1),   # soft orange
+            bg_color=(0.996, 0.851, 0.502, 1),  # soft orange
         )
         self.recipient_col = AddressColumn(
             "PRÍJEMCA",
@@ -99,8 +99,6 @@ class Step2AddressesScreen(BaseScreen):
 
         scroll.add_widget(inner)
         ca.add_widget(scroll)
-
-        # Nav buttons
         ca.add_widget(self._nav_buttons())
 
     def _nav_buttons(self):
@@ -119,6 +117,7 @@ class Step2AddressesScreen(BaseScreen):
         return row
 
     def _on_next(self, *_):
+        # Uloženie adries do ShipmentService — nastaví aj trasu pre krok 3
         self.app.shipment_service.save_addresses(
             sender=self.sender_col.get_data(),
             recipient=self.recipient_col.get_data(),

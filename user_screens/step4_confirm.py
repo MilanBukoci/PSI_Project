@@ -1,5 +1,5 @@
 """
-user_screens/step4_confirm.py – Step 4: Order confirmed screen.
+user_screens/step4_confirm.py – Krok 4: Potvrdenie objednávky (UC03).
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -20,14 +20,12 @@ class Step4ConfirmScreen(BaseScreen):
 
     def build_content(self):
         ca = self.content_area
-
         ca.add_widget(StepIndicator(current_step=4,
                                     size_hint_y=None, height=dp(54)))
 
-        # Spacer
         ca.add_widget(Label(size_hint_y=None, height=dp(20)))
 
-        # Green checkmark circle
+        # Zelený kruh s potvrdením úspešnej objednávky
         check_wrap = BoxLayout(size_hint_y=None, height=dp(90))
         check_lbl = Label(
             text="OK",
@@ -42,7 +40,6 @@ class Step4ConfirmScreen(BaseScreen):
         check_wrap.add_widget(check_lbl)
         ca.add_widget(check_wrap)
 
-        # Title
         ca.add_widget(Label(
             text="[b]Objednávka vytvorená[/b]",
             markup=True,
@@ -52,7 +49,6 @@ class Step4ConfirmScreen(BaseScreen):
             height=dp(34),
         ))
 
-        # Subtitle
         ca.add_widget(Label(
             text="Platba bola úspešne spracovaná.",
             font_size=dp(13),
@@ -61,7 +57,7 @@ class Step4ConfirmScreen(BaseScreen):
             height=dp(22),
         ))
 
-        # Order ID badge
+        # Odznak s číslom objednávky
         shipment = self.app.shipment_service.current_shipment
         id_box = BoxLayout(size_hint_y=None, height=dp(36),
                            padding=[dp(60), dp(4)])
@@ -80,7 +76,6 @@ class Step4ConfirmScreen(BaseScreen):
         id_box.add_widget(id_lbl)
         ca.add_widget(id_box)
 
-        # Info text
         ca.add_widget(Label(
             text="Potvrdenie sme odoslali na váš email.\nKuriér prevezme balík do 24 hodín.",
             font_size=dp(13),
@@ -92,7 +87,7 @@ class Step4ConfirmScreen(BaseScreen):
 
         ca.add_widget(Label(size_hint_y=1))
 
-        # Home button
+        # Tlačidlo návratu na domovskú obrazovku
         home_btn = RoundedButton(
             text="Domov",
             bg_color=Colors.ORANGE,
@@ -112,7 +107,7 @@ class Step4ConfirmScreen(BaseScreen):
 
     def on_enter(self):
         super().on_enter()
-        # Subscribe to order status via socket stub
+        # Prihlásenie na odber aktualizácií stavu zásielky cez socket stub
         shipment = self.app.shipment_service.current_shipment
         self.app.socket_service.subscribe_shipment_status(
             shipment.id,
@@ -120,5 +115,5 @@ class Step4ConfirmScreen(BaseScreen):
         )
 
     def _on_status_update(self, data):
-        """Called when the server pushes a status change (stub)."""
+        """Zavolané pri push notifikácii o zmene stavu zo servera (stub)."""
         pass
