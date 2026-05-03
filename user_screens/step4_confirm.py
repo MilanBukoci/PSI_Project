@@ -30,7 +30,7 @@ class Step4ConfirmScreen(BaseScreen):
         # Green checkmark circle
         check_wrap = BoxLayout(size_hint_y=None, height=dp(90))
         check_lbl = Label(
-            text="✔",
+            text="OK",
             font_size=dp(44),
             color=Colors.WHITE,
             bold=True,

@@ -88,18 +88,10 @@ class ZippyLabel(Label):
 class _StepCircle(Widget):
     def __init__(self, number, active, **kwargs):
         kwargs.setdefault("size_hint", (None, None))
-        kwargs.setdefault("size", (dp(28), dp(28)))
+        kwargs.setdefault("size", (dp(28), dp(28)))  # keep square so it's a circle
         super().__init__(**kwargs)
         self.number = number
         self.active = active
-
-        self._lbl = Label(
-            text=str(number),
-            font_size=dp(13),
-            bold=True,
-            color=Colors.WHITE,
-        )
-        self.add_widget(self._lbl)
         self.bind(pos=self._draw, size=self._draw)
 
     def _draw(self, *_):
@@ -108,8 +100,29 @@ class _StepCircle(Widget):
         with self.canvas:
             Color(*color)
             RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(14)])
-        self._lbl.center = self.center
-        self._lbl.size = self.size
+            Color(1, 1, 1, 1)
+        lbl = Label(
+            text=str(self.number),
+            font_size=dp(12),
+            bold=True,
+            color=(1, 1, 1, 1),
+            center=self.center,
+            size=self.size,
+        )
+        # draw text via canvas
+        from kivy.core.text import Label as CoreLabel
+        core = CoreLabel(text=str(self.number), font_size=dp(12), bold=True)
+        core.refresh()
+        texture = core.texture
+        tw, th = texture.size
+        with self.canvas:
+            Color(1, 1, 1, 1)
+            Rectangle(
+                texture=texture,
+                pos=(self.center_x - tw/2, self.center_y - th/2),
+                size=(tw, th)
+            )
+
 
 
 class StepIndicator(BoxLayout):
@@ -118,31 +131,37 @@ class StepIndicator(BoxLayout):
     def __init__(self, current_step=1, **kwargs):
         kwargs.setdefault("orientation", "horizontal")
         kwargs.setdefault("size_hint_y", None)
-        kwargs.setdefault("height", dp(54))
-        kwargs.setdefault("padding", [dp(12), dp(4)])
-        kwargs.setdefault("spacing", dp(4))
+        kwargs.setdefault("height", dp(64))
+        kwargs.setdefault("padding", [dp(16), dp(8)])
+        kwargs.setdefault("spacing", dp(0))
         super().__init__(**kwargs)
         self.current_step = current_step
+        self._circles = []
         self._build()
+        self.bind(pos=self._draw_lines, size=self._draw_lines)
 
     def _build(self):
         self.clear_widgets()
+        self._circles = []
         for i, label in enumerate(self.STEPS, start=1):
-            col = BoxLayout(
-                orientation="vertical",
-                spacing=dp(2),
-                size_hint_x=1,
-            )
+            col = BoxLayout(orientation="vertical", spacing=dp(4), size_hint_x=1)
             active = (i == self.current_step)
 
-            circle = _StepCircle(
-                number=i,
-                active=active,
-                size_hint=(None, None),
-                size=(dp(28), dp(28)),
-                pos_hint={"center_x": 0.5},
+            circle = _StepCircle(number=i, active=active,
+                                 size_hint=(None, None), size=(dp(28), dp(28)),
+                                 pos_hint={"center_x": 0.5})
+            self._circles.append(circle)
+
+            from kivy.uix.anchorlayout import AnchorLayout
+
+            circle_wrap = AnchorLayout(
+                anchor_x="center",
+                anchor_y="center",
+                size_hint_y=None,
+                height=dp(28),
             )
-            col.add_widget(circle)
+            circle_wrap.add_widget(circle)
+            col.add_widget(circle_wrap)
 
             lbl = Label(
                 text=label,
@@ -151,24 +170,34 @@ class StepIndicator(BoxLayout):
                 bold=active,
                 size_hint_y=None,
                 height=dp(14),
+                halign="center",
             )
+            lbl.bind(size=lbl.setter("text_size"))
             col.add_widget(lbl)
             self.add_widget(col)
 
-            if i < len(self.STEPS):
-                line = Widget(size_hint_x=0.3)
 
-                def redraw(w, *_):
-                    w.canvas.clear()
-                    with w.canvas:
-                        Color(*Colors.MID_GRAY)
-                        Rectangle(
-                            pos=(w.x, w.y + w.height - dp(14) - dp(1)),
-                            size=(w.width, dp(2))
-                        )
+    def _draw_lines(self, *_):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(*Colors.WHITE)
+            Rectangle(pos=self.pos, size=self.size)
+        # draw lines between circles after they have positions
+        from kivy.clock import Clock
+        Clock.schedule_once(self._draw_lines_now, 0)
 
-                line.bind(pos=redraw, size=redraw)
-                self.add_widget(line)
+    def _draw_lines_now(self, *_):
+        self.canvas.after.clear()
+        with self.canvas.after:
+            Color(*Colors.STEP_INACTIVE)
+            for i in range(len(self._circles) - 1):
+                c1 = self._circles[i]
+                c2 = self._circles[i + 1]
+                # line from right edge of c1 to left edge of c2, at circle center_y
+                Rectangle(
+                    pos=(c1.right, c1.center_y - dp(0.75)),
+                    size=(c2.x - c1.right, dp(1.5))
+                )
 
 # ── Bottom nav bar ────────────────────────────────────────────────────────────
 class BottomNav(BoxLayout):

@@ -102,26 +102,25 @@ class ShipmentService:
 
     def save_addresses(self, sender: dict, recipient: dict):
         s = self.current_shipment.sender
-        s.first_name   = sender.get("first_name", "")
-        s.last_name    = sender.get("last_name", "")
-        s.street       = sender.get("street", "")
-        s.postal_code  = sender.get("postal_code", "")
+        s.first_name = sender.get("first_name", "")
+        s.last_name = sender.get("last_name", "")
+        s.street = sender.get("street", "")
+        s.postal_code = sender.get("postal_code", "")
 
         r = self.current_shipment.recipient
-        r.first_name   = recipient.get("first_name", "")
-        r.last_name    = recipient.get("last_name", "")
-        r.street       = recipient.get("street", "")
-        r.postal_code  = recipient.get("postal_code", "")
+        r.first_name = recipient.get("first_name", "")
+        r.last_name = recipient.get("last_name", "")
+        r.street = recipient.get("street", "")
+        r.postal_code = recipient.get("postal_code", "")
+
+        # set route so step 3 summary can display it
+        self.current_shipment.route = f"{s.postal_code[:2]} -> {r.first_name} {r.last_name}"
         log.debug("Addresses saved")
 
     def save_payment_method(self, method: str):
         self.current_shipment.payment_method = method
 
     def submit_shipment(self, simulate_failure=False) -> bool:
-        """
-        Mock submission. Returns True on success, False on failure.
-        Set simulate_failure=True to test the error state.
-        """
         shipment = self.current_shipment
         if simulate_failure:
             shipment.status = "failed"
@@ -129,17 +128,37 @@ class ShipmentService:
             return False
 
         shipment.status = "paid"
+        shipment.delivery_date = date.today() + timedelta(days=shipment.delivery_days)  # ← add this
         log.info("shipment %s submitted successfully", shipment.id)
-        MOCK_ACTIVE_shipmentS.append({
+        self._uc01_shipments[shipment.id] = {
             "id": shipment.id,
-            "route": shipment.route,
+            "recipient_name": f"{shipment.recipient.first_name} {shipment.recipient.last_name}",
+            "address": shipment.recipient.street,
+            "postal_code": shipment.recipient.postal_code,
             "status": "Pripravuje sa",
-            "color": (0.961, 0.651, 0.137, 1),  # orange
-        })
+            "depot_region": shipment.recipient.postal_code[:2],
+            "delivery_date": shipment.delivery_date,
+            "payment_status": "nezaplatená",
+            "pending_surcharge": 0.0,
+        }
         return True
 
     def get_active_shipments(self) -> list[dict]:
-        return MOCK_ACTIVE_shipmentS
+        status_colors = {
+            "Na ceste": (0.18, 0.8, 0.44, 1),
+            "Čaká": (0.961, 0.651, 0.137, 1),
+            "Doručuje sa": (0.169, 0.169, 1.0, 1),
+            "Doručené": (0.75, 0.75, 0.75, 1),
+        }
+        return [
+            {
+                "id": s["id"],
+                "route": f"{s['depot_region']} -> {s['recipient_name']}",
+                "status": s["status"],
+                "color": status_colors.get(s["status"], (0.5, 0.5, 0.5, 1)),
+            }
+            for s in self._uc01_shipments.values()
+        ]
 
     # ── UC01 redirect shipment by recipient ───────────────────────────────────
 

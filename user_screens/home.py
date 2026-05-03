@@ -114,7 +114,6 @@ class HomeScreen(BaseScreen):
         ("", "Odoslať balík", "Vytvoriť objednávku", "step1"),
         ("", "Sledovať", "Zadajte číslo", "uc01_redirect"),
         ("", "Naplánovať", "Vyzdvihnutie", None),
-        ("", "História", "Vaše zásielky", None),
     ]
 
     def on_enter(self):

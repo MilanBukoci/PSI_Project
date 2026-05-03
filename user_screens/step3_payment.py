@@ -15,9 +15,9 @@ from theme import Colors, StepIndicator, RoundedButton
 
 
 PAYMENT_OPTIONS = [
-    ("card",  "", "Platobná karta",  "Visa, Mastercard, Maestro"),
-    ("gpay",  "G",  "Google Pay",      "Rýchla platba cez Google"),
-    ("cash",  "", "Hotovosti",       "Kuriérovi"),
+    ("card",  "CARD", "Platobná karta",  "Visa, Mastercard, Maestro"),
+    ("gpay",  "G",    "Google Pay",      "Rýchla platba cez Google"),
+    ("cash",  "CASH", "Hotovosti",       "Kuriérovi"),
 ]
 
 
@@ -41,9 +41,6 @@ class PaymentOptionRow(BoxLayout):
             size=(dp(24), dp(40)),
         )
 
-        # Icon
-        icon_lbl = Label(text=icon, font_size=dp(18),
-                         size_hint=(None, None), size=(dp(28), dp(40)))
 
         # Text
         text_col = BoxLayout(orientation="vertical", spacing=dp(1))
@@ -56,8 +53,6 @@ class PaymentOptionRow(BoxLayout):
         text_col.add_widget(t_lbl)
         text_col.add_widget(s_lbl)
 
-        self.add_widget(self._radio)
-        self.add_widget(icon_lbl)
         self.add_widget(text_col)
 
     def select(self):
@@ -101,25 +96,18 @@ class Step3PaymentScreen(BaseScreen):
 
         # Summary section
         inner.add_widget(self._bold_label("SÚHRN"))
-        shipment = self.app.shipment_service.current_shipment
-        for key, val in shipment.summary_lines():
-            row = BoxLayout(orientation="horizontal",
-                            size_hint_y=None, height=dp(22))
-            row.add_widget(Label(text=key, font_size=dp(13),
-                                 color=Colors.MID_GRAY, halign="left"))
-            row.add_widget(Label(text=val, font_size=dp(13),
-                                 color=Colors.DARK_TEXT, halign="right"))
-            inner.add_widget(row)
+        self._summary_box = BoxLayout(orientation="vertical", size_hint_y=None,
+                                      spacing=dp(4))
+        self._summary_box.bind(minimum_height=self._summary_box.setter("height"))
+        inner.add_widget(self._summary_box)
 
         # Total
-        total_row = BoxLayout(orientation="horizontal",
-                              size_hint_y=None, height=dp(28))
+        total_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(28))
         total_row.add_widget(self._bold_label("SPOLU"))
-        price_lbl = Label(text=f"{shipment.price:.2f} €",
-                          font_size=dp(16), bold=True,
-                          color=Colors.DARK_TEXT, halign="right")
-        price_lbl.bind(size=price_lbl.setter("text_size"))
-        total_row.add_widget(price_lbl)
+        self._price_lbl = Label(text="0.00 €", font_size=dp(16), bold=True,
+                                color=Colors.DARK_TEXT, halign="right")
+        self._price_lbl.bind(size=self._price_lbl.setter("text_size"))
+        total_row.add_widget(self._price_lbl)
         inner.add_widget(total_row)
 
         # Error banner (hidden by default)
@@ -159,7 +147,7 @@ class Step3PaymentScreen(BaseScreen):
                                                radius=[dp(8)])
         banner.bind(pos=self._upd_banner, size=self._upd_banner)
         lbl = Label(
-            text="⚠  Platba zamietnutá. Skúste inú metódu\nalebo to zopakujte.",
+            text="  Platba zamietnutá. Skúste inú metódu\nalebo to zopakujte.",
             font_size=dp(12),
             color=Colors.WHITE,
             halign="left",
@@ -205,3 +193,22 @@ class Step3PaymentScreen(BaseScreen):
             self.go_to("step4")
         else:
             self._error_banner.opacity = 1
+
+    def on_enter(self):
+        super().on_enter()
+        # rebuild summary with fresh shipment data
+        self._rebuild_summary()
+
+    def _rebuild_summary(self):
+        self._summary_box.clear_widgets()
+        shipment = self.app.shipment_service.current_shipment
+
+        for key, val in shipment.summary_lines():
+            row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(22))
+            row.add_widget(Label(text=key, font_size=dp(13),
+                                 color=Colors.MID_GRAY, halign="left"))
+            row.add_widget(Label(text=val, font_size=dp(13),
+                                 color=Colors.DARK_TEXT, halign="right"))
+            self._summary_box.add_widget(row)
+
+        self._price_lbl.text = f"{shipment.price:.2f} €"
