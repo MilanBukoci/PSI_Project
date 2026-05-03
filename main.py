@@ -35,14 +35,13 @@ from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable1Screen
 from courier_screens.uc04_confirm_and_unavailable import UC04Unavailable2Screen
 from courier_screens.uc04_notifications import UC04NotificationsScreen
 
-# ── UC02 (Adam) ──────────────────────────────────────────────────────────────
+# UC02: tri obrazovky pridelenia + dispečerské notifikácie; stav výberov v ZippyApp.
 from dispatcher_screens.uc02_dispatcher import (
     UC02ShipmentListScreen,
     UC02CourierSelectScreen,
     UC02ConfirmScreen,
 )
 from dispatcher_screens.uc02_notifications import UC02NotificationsScreen
-# -----------------------------------------------------------------------------
 
 Window.size = (400, 700)
 
@@ -91,7 +90,7 @@ ScreenManager:
         name: 'uc01_redirect'
     UC01RedirectDetailScreen:
         name: 'uc01_detail'
-    # ── UC02 (Adam) ──────────────────────────────────────────────────────────
+    # UC02 – dispečer: zásielky → kuriér → potvrdenie; samostatný inbox uc02_notifications
     UC02ShipmentListScreen:
         name: 'uc02_shipment_list'
     UC02CourierSelectScreen:
@@ -112,15 +111,16 @@ class ZippyApp(App):
         self.shipment_service = ShipmentService()
         self.notification_service = NotificationService()
         self.uc04_service = UC04DeliveryService()  # UC04
-        self.uc02_service = UC02DispatcherService()  # UC02
+        self.uc02_service = UC02DispatcherService()  # biznisová vrstva UC02 (mock údaje)
         # uc04_selected_id stores which shipment is currently being delivered
         self.uc04_selected_id: str | None = None
         self.uc04_return_screen: str = "uc04_list"
         self.uc01_selected_id: str | None = None
         self.uc01_return_screen: str = "uc01_redirect"
-        # UC02 dispatcher state
+        # Stav wizardu UC02 medzi ScreenManager transitions (bez globálov ani Routeru).
         self.uc02_selected_shipments: list = []
         self.uc02_selected_courier_id: str | None = None
+        # Kam sa vrátiť zo „Upozornení“ dispečera (nastaví base_screen pri otvorení FAB).
         self.uc02_return_screen: str = "uc02_shipment_list"
         self.user_name: str = ""
 

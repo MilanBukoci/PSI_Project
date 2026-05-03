@@ -8,6 +8,7 @@ class NotificationService:
         self._by_role: dict[str, list[dict]] = {
             "customer": [],
             "courier": [],
+            # Inbox prihláseného dispečera (obrazovka UC02NotificationsScreen).
             "dispatcher": [],
         }
 

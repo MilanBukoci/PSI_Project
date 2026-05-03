@@ -1,3 +1,11 @@
+"""
+Obrazovka upozornení pre rolu dispatcher (kliknutie na ikonu v hlavičke CourierBaseScreen).
+
+Údaje sú z NotificationService („dispatcher“), nie z UC02DispatcherService — tá simuluje push
+ku kuriérom. Dispečer tu vidí vlastné systémové hlášky; návrat obnoví obrazovku uloženú
+v app.uc02_return_screen (fallback uc02_shipment_list).
+"""
+
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
@@ -9,7 +17,7 @@ from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class UC02NotificationsScreen(BaseScreen):
-    """Simple dispatcher notifications screen."""
+    """Zoznam notifikácií pre dispečera; časové razítko ako posledný riadok v karte."""
 
     def header_subtitle(self):
         return "DISPEČER – Upozornenia"
@@ -34,6 +42,7 @@ class UC02NotificationsScreen(BaseScreen):
         title.bind(size=title.setter("text_size"))
         ca.add_widget(title)
 
+        # Samostatný inbox roly; pridelenie zásielok samotné sem zatiaľ nepushuje správy.
         notifications = self.app.notification_service.get_for_role("dispatcher")
         scroll = ScrollView(size_hint_y=1)
         col = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
@@ -51,6 +60,7 @@ class UC02NotificationsScreen(BaseScreen):
             empty.bind(size=empty.setter("text_size"))
             col.add_widget(empty)
         else:
+            # Najnovšie navrchu (pole sa appenduje na koniec).
             for note in reversed(notifications):
                 row = BoxLayout(
                     orientation="vertical",

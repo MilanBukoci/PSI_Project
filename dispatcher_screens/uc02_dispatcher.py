@@ -1,10 +1,14 @@
 """
-dispatcher_screens/uc02_dispatcher.py – UC02: Pridelenie zásielky kuriérovi.
+UC02 – Pridelenie zásielky kuriérovi (workflow dispečera v Kivy).
 
-Three screens for the dispatcher workflow:
-  1. UC02ShipmentListScreen  – view & select unassigned shipments
-  2. UC02CourierSelectScreen  – pick an available courier
-  3. UC02ConfirmScreen        – confirm assignment & see result
+Tok obrazoviek naväzuje na seba a stav drží App (vid. main.ZippyApp):
+  1. Zoznam zásielok – výber jednej alebo viacerých pending zásielok, voliteľný filter.
+  2. Výber kuriéra – karty so stavom; aj nedostupní ostávajú klikateľní → chybu vráti
+     až servis po Potvrď (ukáže validácie ako v scenári).
+  3. Potvrdenie – sumár, volanie UC02DispatcherService.assign_shipments, zobrazenie výsledku
+     vrátane náhľadu „notifikácie“ kuriérovi pri úspechu.
+
+Pri každom on_enter sa content prekresľuje zo service (žiadny samostatný cache v screene).
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -26,7 +30,7 @@ from user_screens.base_screen import CourierBaseScreen as BaseScreen
 # ═════════════════════════════════════════════════════════════════════════════
 
 class _ShipmentCheckRow(BoxLayout):
-    """One shipment row with a checkbox (only for unassigned)."""
+    """Jeden riadok v scroll liste: checkbox iba ak status pending (pridelené len čítajú info)."""
 
     def __init__(self, shipment: dict, on_check=None, **kwargs):
         super().__init__(
@@ -48,7 +52,7 @@ class _ShipmentCheckRow(BoxLayout):
                                          radius=[dp(10)])
         self.bind(pos=self._draw, size=self._draw)
 
-        # Checkbox column (only if unassigned)
+        # Stĺpec výberu: pending → skutočný CheckBox; inak spacer kvôli zarovnaniu šírok.
         if is_unassigned:
             cb_box = BoxLayout(size_hint_x=None, width=dp(36))
             self.cb = CheckBox(
@@ -118,7 +122,7 @@ class _ShipmentCheckRow(BoxLayout):
 
 
 class UC02ShipmentListScreen(BaseScreen):
-    """Step 1: Dispatcher views shipments and selects unassigned ones."""
+    """Krok 1 UC02: prehľad zásielok, výber id do množiny, navigácia na výber kuriéra."""
 
     def __init__(self, **kwargs):
         self._filter_unassigned = False
@@ -127,7 +131,7 @@ class UC02ShipmentListScreen(BaseScreen):
 
     def on_enter(self):
         super().on_enter()
-        self._selected_ids.clear()
+        self._selected_ids.clear()  # pri návrate z ďalších krokov začať bez „visiacich“ výberov
         self.content_area.clear_widgets()
         self.build_content()
 
@@ -144,7 +148,7 @@ class UC02ShipmentListScreen(BaseScreen):
             size_hint_y=None, height=dp(30), halign="left",
         ))
 
-        # Filter toggle row
+        # Prepínač „všetky“ vs „len nepridelené“ — pri zmene sa resetuje výber (jednoduchší model).
         filter_row = BoxLayout(orientation="horizontal",
                                size_hint_y=None, height=dp(36),
                                spacing=dp(8))
@@ -190,7 +194,7 @@ class UC02ShipmentListScreen(BaseScreen):
         scroll.add_widget(col)
         ca.add_widget(scroll)
 
-        # Assign button
+        # Aktívna farba iba ak je niečo zaškrtnuté; text ukazuje počet vybratých ID.
         self._assign_btn = RoundedButton(
             text="Prideliť kuriérovi",
             bg_color=Colors.MID_GRAY,
@@ -231,7 +235,7 @@ class UC02ShipmentListScreen(BaseScreen):
         if not self._selected_ids:
             return
         app = App.get_running_app()
-        app.uc02_selected_shipments = list(self._selected_ids)
+        app.uc02_selected_shipments = list(self._selected_ids)  # zdieľaný stav ďalších obrazoviek UC02
         self.go_to("uc02_courier_select")
 
 
@@ -240,7 +244,7 @@ class UC02ShipmentListScreen(BaseScreen):
 # ═════════════════════════════════════════════════════════════════════════════
 
 class _CourierCard(BoxLayout):
-    """Card showing one courier with load bar."""
+    """Karta kuriéra: meno, stav práce/kapacity, vizuál vyťaženia, tlačidlo Vybrať."""
 
     def __init__(self, courier: dict, on_select=None, **kwargs):
         super().__init__(
@@ -256,7 +260,7 @@ class _CourierCard(BoxLayout):
         available = courier["is_available"]
         is_full = courier["is_full"]
 
-        # Background — grey if unavailable
+        # Nedostupní vizuálne splývajú — logika blokovania ostáva v servise pri potvrdení.
         bg_color = (0.85, 0.85, 0.85, 1) if not available else Colors.LIGHT_GRAY
         with self.canvas.before:
             Color(*bg_color)
@@ -338,7 +342,7 @@ class _CourierCard(BoxLayout):
         bar_container.add_widget(bar_bg)
         self.add_widget(bar_container)
 
-        # Row 4: Select button — shown for ALL couriers
+        # Vždy „Vybrať“: používateľ môže doručiť nevhodného kuriéra na krok Potvrď a tam dostať jasnú hlášku.
         if not available:
             btn_color = Colors.MID_GRAY
             btn_text = "Vybrať (nie je v práci)"
@@ -370,7 +374,7 @@ class _CourierCard(BoxLayout):
 
 
 class UC02CourierSelectScreen(BaseScreen):
-    """Step 2: Dispatcher selects a courier for the shipments."""
+    """Krok 2 UC02: zápis vybraného courier_id do App a prechod na sumár."""
 
     def on_enter(self):
         super().on_enter()
@@ -433,7 +437,7 @@ class UC02CourierSelectScreen(BaseScreen):
 # ═════════════════════════════════════════════════════════════════════════════
 
 class UC02ConfirmScreen(BaseScreen):
-    """Step 3: Review and confirm shipment assignment."""
+    """Krok 3 UC02: sumár výberov, jediné miesto kde sa volí assign_shipments na servise."""
 
     def on_enter(self):
         super().on_enter()
@@ -455,7 +459,7 @@ class UC02ConfirmScreen(BaseScreen):
             size_hint_y=None, height=dp(30), halign="left",
         ))
 
-        # ── Selected shipments summary ────────────────────────────────────────
+        # Zobrazí len položky, ktorých id sú stále v app.uc02_selected_shipments (plochý join so zoznamom zo servisu).
         ca.add_widget(Label(
             text="Vybrané zásielky:", font_size=dp(14), bold=True,
             color=Colors.BLUE, size_hint_y=None, height=dp(22), halign="left",
@@ -491,7 +495,7 @@ class UC02ConfirmScreen(BaseScreen):
                 row.add_widget(route_lbl)
                 ca.add_widget(row)
 
-        # ── Selected courier summary ──────────────────────────────────────────
+        # Kuriér podľa zapamätaného id; ak chýba, blok sa vynechá (edge case prázdnej relácie).
         ca.add_widget(Widget(size_hint_y=None, height=dp(10)))
         ca.add_widget(Label(
             text="Vybraný kuriér:", font_size=dp(14), bold=True,
@@ -532,7 +536,7 @@ class UC02ConfirmScreen(BaseScreen):
             c_row.add_widget(load_lbl)
             ca.add_widget(c_row)
 
-        # ── Status label (for result messages) ────────────────────────────────
+        # Po pokuse o pridelenie sa tu zobrazí buď úspešná správa, alebo slovenský text z result["message"].
         self._status_label = Label(
             text="", font_size=dp(13), color=Colors.DARK_TEXT,
             size_hint_y=None, height=dp(50),
@@ -541,7 +545,7 @@ class UC02ConfirmScreen(BaseScreen):
         )
         ca.add_widget(self._status_label)
 
-        # ── Notification preview area ─────────────────────────────────────────
+        # Po úspechu sa rozšíri o náhľad kuriérskej „push“ správy (rovnaký obsah ako v servise).
         self._notif_box = BoxLayout(orientation="vertical",
                                     size_hint_y=None, height=0)
         ca.add_widget(self._notif_box)
@@ -581,7 +585,7 @@ class UC02ConfirmScreen(BaseScreen):
             self._status_label.color = Colors.SUCCESS_GRN
             self._status_label.text = result["message"]
 
-            # Show courier notification mock
+            # Mock UI zhodný s textom, ktorý servis uložil do histórie kuriéra.
             self._notif_box.clear_widgets()
             self._notif_box.height = dp(70)
 
@@ -595,7 +599,7 @@ class UC02ConfirmScreen(BaseScreen):
             )
             self._notif_box.add_widget(notif_lbl)
 
-            # Disable confirm button, change to "Done"
+            # Pôvodné potvrdenie už nedáva zmysel; tlačidlo slúži na návrat do zoznamu zásielok.
             self._confirm_btn.text = "Hotovo"
             self._confirm_btn.set_bg(Colors.SUCCESS_GRN)
             self._confirm_btn.unbind(on_release=lambda *_: None)

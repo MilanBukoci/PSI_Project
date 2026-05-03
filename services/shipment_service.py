@@ -244,6 +244,7 @@ class ShipmentService:
             "message": "Adresa doručenia bola úspešne zmenená.",
             "notify": shipment["last_redirect_note"],
             "surcharge": surcharge,
+            # Pri doplatku treba vedieť dispečera (rovnaký inbox ako obrazovka UC02NotificationsScreen).
             "notify_roles": ["customer", "dispatcher"] if surcharge > 0 else ["customer", "courier"],
         }
 

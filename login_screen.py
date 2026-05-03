@@ -195,4 +195,5 @@ class LoginScreen(Screen):
             )
             self.go_to("uc04_list")
         elif result["role"] == "dispatcher":
+            # Predvolená domovská vetva UC02 – zoznam zásielok na pridelenie.
             self.go_to("uc02_shipment_list")
