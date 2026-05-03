@@ -20,7 +20,11 @@ from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class ShipmentListRow(BoxLayout):
-    """One row in the today's shipments list."""
+    """
+    Jeden riadok v zozname dnešných zásielok.
+    Zobrazuje ID zásielky, adresu, príjemcu a farebný status badge.
+    Po kliknutí zavolá callback on_tap s dátami zásielky.
+    """
 
     def __init__(self, shipment: dict, on_tap=None, **kwargs):
         super().__init__(
@@ -34,12 +38,13 @@ class ShipmentListRow(BoxLayout):
         self._shipment = shipment
         self._on_tap = on_tap
 
+        # Svetlošedé zaoblené pozadie riadku
         with self.canvas.before:
             Color(*Colors.LIGHT_GRAY)
             self._bg = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
         self.bind(pos=self._draw, size=self._draw)
 
-        # Row 1: ID + status badge
+        # Riadok 1: ID zásielky + farebný status badge vpravo
         top_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(22))
         id_lbl = Label(
             text=shipment["id"],
@@ -49,6 +54,7 @@ class ShipmentListRow(BoxLayout):
         )
         id_lbl.bind(size=id_lbl.setter("text_size"))
 
+        # Badge zobrazuje aktuálny status zásielky s farebným pozadím
         badge = Label(
             text=shipment["status"],
             font_size=dp(10),
@@ -59,6 +65,7 @@ class ShipmentListRow(BoxLayout):
         with badge.canvas.before:
             Color(*Colors.ORANGE)
             self._badge_bg = RoundedRectangle(pos=badge.pos, size=badge.size, radius=[dp(6)])
+        # Badge sa prekreslí pri každej zmene pozície/veľkosti
         badge.bind(pos=self._redraw_badge, size=self._redraw_badge)
         self._badge = badge
 
@@ -66,7 +73,7 @@ class ShipmentListRow(BoxLayout):
         top_row.add_widget(badge)
         self.add_widget(top_row)
 
-        # Row 2: address
+        # Riadok 2: Adresa príjemcu (tučné)
         addr_lbl = Label(
             text=shipment["address"],
             font_size=dp(14),
@@ -79,7 +86,7 @@ class ShipmentListRow(BoxLayout):
         addr_lbl.bind(size=addr_lbl.setter("text_size"))
         self.add_widget(addr_lbl)
 
-        # Row 3: recipient
+        # Riadok 3: Meno príjemcu (šedé, menšie)
         recip_lbl = Label(
             text=f"Príjemca: {shipment['recipient']}",
             font_size=dp(12),
@@ -92,10 +99,19 @@ class ShipmentListRow(BoxLayout):
         self.add_widget(recip_lbl)
 
     def _draw(self, *_):
+        """Aktualizuje pozadie keď sa zmení pozícia alebo veľkosť widgetu."""
         self._bg.pos = self.pos
         self._bg.size = self.size
 
     def _redraw_badge(self, w, *_):
+        """
+        Prekreslí farebné pozadie badge podľa aktuálneho statusu zásielky.
+        Farby sú konzistentné s celou aplikáciou:
+          zelená  = Doručené
+          červená = Vrátenie / Nedostupný
+          modrá   = Vyzdvihnutá / Na ceste
+          oranžová = ostatné (Na vyzdvihnutie)
+        """
         status = self._shipment["status"]
         if status == "Doručené":
             color = Colors.SUCCESS_GRN
@@ -111,6 +127,10 @@ class ShipmentListRow(BoxLayout):
             RoundedRectangle(pos=w.pos, size=w.size, radius=[dp(6)])
 
     def on_touch_down(self, touch):
+        """
+        Zachytí kliknutie na riadok a zavolá callback on_tap.
+        Vracia True aby zamedzil propagácii eventu na rodičovský widget.
+        """
         if self.collide_point(*touch.pos) and self._on_tap:
             self._on_tap(self._shipment)
             return True
@@ -118,11 +138,19 @@ class ShipmentListRow(BoxLayout):
 
 
 class UC04ShipmentListScreen(BaseScreen):
-    """Shows today's assigned shipments and a 'Ďalej' button."""
+    """
+    Prvá obrazovka kuriérskeho flow — zoznam všetkých dnešných zásielok.
+    Kuriér tu vidí prehľad zásielok a môže pokračovať na vyzdvihnutie
+    alebo priamo na trasu (ak už boli všetky vyzdvihnuté).
+    """
 
     def on_enter(self):
+        """
+        Prebuduje celý obsah pri každom vstupe na obrazovku.
+        Dôležité — statusy zásielok sa môžu meniť počas doručovania,
+        takže zoznam musí byť vždy aktuálny.
+        """
         super().on_enter()
-        # Rebuild list every time so statuses are up to date
         self.content_area.clear_widgets()
         self.build_content()
 
@@ -148,12 +176,14 @@ class UC04ShipmentListScreen(BaseScreen):
             halign="left",
         ))
 
+        # ScrollView umožňuje scrollovanie ak je zásielok viac ako sa zmestí na obrazovku
         scroll = ScrollView(size_hint_y=1)
         col = BoxLayout(
             orientation="vertical",
             spacing=dp(8),
             size_hint_y=None,
         )
+        # minimum_height zabezpečí že BoxLayout sa roztiahne podľa obsahu
         col.bind(minimum_height=col.setter("height"))
 
         svc = App.get_running_app().uc04_service
@@ -167,6 +197,7 @@ class UC04ShipmentListScreen(BaseScreen):
         scroll.add_widget(col)
         ca.add_widget(scroll)
 
+        # Tlačidlo Ďalej — sivé ak sú všetky zásielky dokončené
         shipments = svc.get_today_shipments()
         all_done = all(s["status"] in ("Doručené", "Vrátenie") for s in shipments)
 
@@ -189,17 +220,26 @@ class UC04ShipmentListScreen(BaseScreen):
         ca.add_widget(logout_btn)
 
     def _on_shipment_tap(self, shipment: dict):
-        """Tapping a row navigates to shipment detail."""
+        """
+        Kliknutie na riadok zásielky — uloží ID vybranej zásielky
+        do app a naviguje na detail obrazovku.
+        """
         app = App.get_running_app()
         app.uc04_selected_id = shipment["id"]
         self.go_to("uc04_shipment_info")
 
     def _on_next(self):
+        """
+        Logika tlačidla Ďalej:
+          - Ak sú všetky zásielky dokončené (Doručené/Vrátenie) → nič sa nestane
+          - Ak existuje aspoň jedna 'Na vyzdvihnutie' → pickup screen
+          - Ak sú všetky vyzdvihnuté ale nie doručené → route screen
+        """
         svc = App.get_running_app().uc04_service
         shipments = svc.get_today_shipments()
         all_done = all(s["status"] in ("Doručené", "Vrátenie") for s in shipments)
         if all_done:
-            return  # tlačidlo je sivé, nič sa nestane
+            return
         all_picked_up = all(s["status"] != "Na vyzdvihnutie" for s in shipments)
         if all_picked_up:
             self.go_to("uc04_route")

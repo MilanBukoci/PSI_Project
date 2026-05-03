@@ -1,6 +1,7 @@
 """
 screens/uc04_pickup.py – UC04 Step 2: Confirm warehouse pickup.
-Courier sees package details (section/rack/police/size) and confirms.
+Courier sees package details (section/rack/police/size) and confirms
+each package individually before starting the delivery route.
 """
 
 from kivy.uix.boxlayout import BoxLayout
@@ -9,13 +10,16 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
 from kivy.app import App
 
-
 from theme import Colors, RoundedButton
 from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class InfoCard(BoxLayout):
-    """A card showing one package's warehouse location."""
+    """
+    Karta zobrazujúca detaily jednej zásielky pri vyzdvihnutí zo skladu.
+    Ukazuje ID, veľkosť, adresu, príjemcu a umiestnenie v sklade
+    (sekcia, regál, polica) vo forme farebných pills.
+    """
 
     def __init__(self, shipment: dict, **kwargs):
         super().__init__(
@@ -31,7 +35,7 @@ class InfoCard(BoxLayout):
             self._bg = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
         self.bind(pos=self._draw, size=self._draw)
 
-        # Header row: shipment ID + size badge
+        # Hlavička: ID zásielky vľavo, veľkosť vpravo
         header = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(22))
         id_lbl = Label(
             text=shipment["id"],
@@ -52,7 +56,7 @@ class InfoCard(BoxLayout):
         header.add_widget(size_lbl)
         self.add_widget(header)
 
-        # Address + recipient
+        # Adresa a meno príjemcu na jednom riadku
         addr = Label(
             text=f"{shipment['address']}  •  {shipment['recipient']}",
             font_size=dp(12),
@@ -64,7 +68,7 @@ class InfoCard(BoxLayout):
         addr.bind(size=addr.setter("text_size"))
         self.add_widget(addr)
 
-        # Warehouse location pills
+        # Umiestnenie v sklade ako farebné pills (Sekcia / Regál / Polica)
         loc_row = BoxLayout(orientation="horizontal", spacing=dp(8),
                             size_hint_y=None, height=dp(30))
         for label, value in [
@@ -77,6 +81,11 @@ class InfoCard(BoxLayout):
         self.add_widget(loc_row)
 
     def _pill(self, text):
+        """
+        Vytvorí malý modrý štítok (pill) s textom.
+        Pozadie sa prekreslí pri každej zmene pozície/veľkosti
+        pomocou closure funkcie redraw.
+        """
         lbl = Label(
             text=text,
             font_size=dp(11),
@@ -99,13 +108,20 @@ class InfoCard(BoxLayout):
         return lbl
 
     def _draw(self, *_):
+        """Aktualizuje pozadie karty pri zmene pozície alebo veľkosti."""
         self._bg.pos = self.pos
         self._bg.size = self.size
 
 
 class UC04PickupScreen(BaseScreen):
-    """Courier confirms pickup of each package one at a time."""
+    """
+    Obrazovka vyzdvihnutia zásielok zo skladu.
+    Kuriér potvrdzuje každú zásielku samostatne — zobrazuje sa
+    vždy jedna karta s progress indikátorom (napr. 'Zásielka 2 / 5').
+    Po potvrdení poslednej zásielky sa automaticky prejde na trasu.
+    """
 
+    # Triedna premenná — index aktuálne zobrazovanej zásielky
     _current_index = 0
 
     def header_subtitle(self):
@@ -115,29 +131,40 @@ class UC04PickupScreen(BaseScreen):
         return "uc04_list"
 
     def on_enter(self):
+        """
+        Pri každom vstupe na obrazovku načíta aktuálny zoznam zásielok
+        a začne od prvej (index 0). Reset indexu zabraňuje tomu,
+        aby kuriér po návrate začínal od posledného miesta.
+        """
         super().on_enter()
         self._shipments = App.get_running_app().uc04_service.get_today_shipments()
+        self._current_index = 0
         self._show_current()
 
     def build_content(self):
-        pass  # built dynamically in _show_current()
+        pass  # Obsah sa buduje dynamicky v _show_current()
 
     def _show_current(self):
+        """
+        Prebuduje obsah obrazovky pre aktuálnu zásielku (podľa _current_index).
+        Ak sme prešli všetky zásielky (index >= total), zavolá all_picked_up()
+        a presmeruje na route screen.
+        """
         ca = self.content_area
         ca.clear_widgets()
 
         total = len(self._shipments)
         idx = self._current_index
 
+        # Všetky zásielky potvrdené — prejdi na trasu
         if idx >= total:
-            # All picked up — confirm all and proceed to route
             App.get_running_app().uc04_service.all_picked_up()
             self.go_to("uc04_route")
             return
 
         shipment = self._shipments[idx]
 
-        # Back button at the top
+        # Tlačidlo Späť — hore vľavo
         back_btn = RoundedButton(
             text="<< Späť",
             bg_color=Colors.MID_GRAY,
@@ -147,7 +174,7 @@ class UC04PickupScreen(BaseScreen):
         back_btn.bind(on_release=self._on_back)
         ca.add_widget(back_btn)
 
-        # Progress indicator e.g. "Zásielka 2 / 4"
+        # Progress indikátor — kuriér vidí koľko zásielok zostáva
         progress_lbl = Label(
             text=f"Zásielka {self._current_index + 1} / {total}",
             font_size=dp(13),
@@ -171,8 +198,10 @@ class UC04PickupScreen(BaseScreen):
 
         ca.add_widget(Label(size_hint_y=None, height=dp(12)))
         ca.add_widget(InfoCard(shipment=shipment))
+        # Pružný spacer tlačí confirm button na spodok obrazovky
         ca.add_widget(Label(size_hint_y=1))
 
+        # Confirm button — celá šírka, dole
         confirm_btn = RoundedButton(
             text="Potvrdiť vyzdvihnutie",
             bg_color=Colors.ORANGE,
@@ -183,9 +212,14 @@ class UC04PickupScreen(BaseScreen):
         ca.add_widget(confirm_btn)
 
     def _on_back(self, *_):
+        """Späť na zoznam zásielok (nie na predchádzajúcu zásielku)."""
         self.go_to("uc04_list", "right")
 
     def _on_confirm(self, *_):
+        """
+        Potvrdí vyzdvihnutie aktuálnej zásielky v service,
+        posunie index na ďalšiu a prebuduje obrazovku.
+        """
         App.get_running_app().uc04_service.confirm_pickup(self._current_index)
         self._current_index += 1
         self._show_current()

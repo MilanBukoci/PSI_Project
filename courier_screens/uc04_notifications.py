@@ -9,12 +9,18 @@ from user_screens.base_screen import CourierBaseScreen as BaseScreen
 
 
 class UC04NotificationsScreen(BaseScreen):
-    """Simple courier notifications screen."""
+    """
+    Obrazovka notifikácií pre kuriéra.
+    Zobrazuje zoznam správ z notification_service filtrovaných pre rolu 'courier'.
+    Notifikácie sú zoradené od najnovšej (reversed).
+    Tlačidlo Späť vráti kuriéra na obrazovku z ktorej prišiel (uc04_return_screen).
+    """
 
     def header_subtitle(self):
         return "COURIER SERVICES s.r.o."
 
     def on_enter(self):
+        """Prebuduje obsah pri každom vstupe — notifikácie sa môžu meniť."""
         super().on_enter()
         self.content_area.clear_widgets()
         self.build_content()
@@ -34,12 +40,15 @@ class UC04NotificationsScreen(BaseScreen):
         title.bind(size=title.setter("text_size"))
         ca.add_widget(title)
 
+        # Načítaj notifikácie pre rolu courier z notification_service
         notifications = self.app.notification_service.get_for_role("courier")
+
         scroll = ScrollView(size_hint_y=1)
         col = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
         col.bind(minimum_height=col.setter("height"))
 
         if not notifications:
+            # Prázdny stav — zobrazí informatívnu správu
             empty = Label(
                 text="Zatiaľ nemáte žiadne upozornenia.",
                 font_size=dp(13),
@@ -51,6 +60,7 @@ class UC04NotificationsScreen(BaseScreen):
             empty.bind(size=empty.setter("text_size"))
             col.add_widget(empty)
         else:
+            # Notifikácie sa zobrazujú od najnovšej (reversed = obrátené poradie)
             for note in reversed(notifications):
                 row = BoxLayout(
                     orientation="vertical",
@@ -62,11 +72,14 @@ class UC04NotificationsScreen(BaseScreen):
                 with row.canvas.before:
                     Color(*Colors.LIGHT_GRAY)
                     bg = RoundedRectangle(pos=row.pos, size=row.size, radius=[dp(8)])
+                # Closure s bg=bg zachytí správnu premennú pre každý riadok
+                # (bez bg=bg by všetky lambda funkcie zdieľali poslednú hodnotu bg)
                 row.bind(
                     pos=lambda w, _, bg=bg: setattr(bg, "pos", w.pos),
                     size=lambda w, _, bg=bg: setattr(bg, "size", w.size),
                 )
 
+                # Text notifikácie — zalamuje sa podľa šírky widgetu
                 msg = Label(
                     text=note.get("message", ""),
                     font_size=dp(12),
@@ -75,6 +88,8 @@ class UC04NotificationsScreen(BaseScreen):
                     valign="middle",
                 )
                 msg.bind(size=lambda inst, _: setattr(inst, "text_size", (inst.width, None)))
+
+                # Časová pečiatka notifikácie
                 stamp = Label(
                     text=note.get("created_at", ""),
                     font_size=dp(10),
@@ -91,6 +106,9 @@ class UC04NotificationsScreen(BaseScreen):
         scroll.add_widget(col)
         ca.add_widget(scroll)
 
+        # Tlačidlo Späť naviguje na obrazovku z ktorej prišiel kuriér.
+        # uc04_return_screen sa nastavuje v base_screen pred navigáciou na notifikácie.
+        # Ak nie je nastavený, použije sa uc04_list ako záložná hodnota.
         back_btn = RoundedButton(
             text="Späť",
             bg_color=Colors.MID_GRAY,
