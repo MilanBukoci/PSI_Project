@@ -5,19 +5,18 @@ from models.shipment import Shipment, PackageDetails, Address
 log = logging.getLogger(__name__)
 
 
-# ── Mock existing orders shown on the home screen ────────────────────────────
 MOCK_ACTIVE_shipmentS = [
     {
         "id":     "ZP-20260323-8841",
         "route":  "Košice -> Ram K.",
         "status": "Na ceste",
-        "color":  (0.18, 0.8, 0.44, 1),   # green
+        "color":  (0.18, 0.8, 0.44, 1),   # zelena
     },
     {
         "id":     "ZP-20260318-4412",
         "route":  "Žilina -> Tomaš H.",
         "status": "Čaká",
-        "color":  (0.961, 0.651, 0.137, 1),  # orange
+        "color":  (0.961, 0.651, 0.137, 1),  # oranzova
     },
 ]
 
@@ -26,6 +25,9 @@ class ShipmentService:
     """Handles order creation, validation, and (stub) submission."""
 
     def __init__(self):
+        # Mock zásielok pre UC01 (presmerovanie / zmena dátumu príjemcom). Kľúčové polia:
+        # status – vstupná podmienka (nie „Doručené“, nie blokovaný stav podľa can_redirect_*);
+        # depot_region / PSČ – výpočet „rovnaký región“ vs. doplatok a notifikácie.
         self._current_shipment: Shipment | None = None
         self._uc01_shipments: dict[str, dict] = {
             "ZP-20260323-8841": {
@@ -78,7 +80,7 @@ class ShipmentService:
             },
         }
 
-    # ── Current order management ──────────────────────────────────────────────
+    # ── Menezment objednavok ──────────────────────────────────────────────
 
     def new_shipment(self) -> Shipment:
         self._current_shipment = Shipment()
@@ -113,7 +115,6 @@ class ShipmentService:
         r.street = recipient.get("street", "")
         r.postal_code = recipient.get("postal_code", "")
 
-        # set route so step 3 summary can display it
         self.current_shipment.route = f"{s.postal_code[:2]} -> {r.first_name} {r.last_name}"
         log.debug("Addresses saved")
 
@@ -160,9 +161,15 @@ class ShipmentService:
             for s in self._uc01_shipments.values()
         ]
 
-    # ── UC01 redirect shipment by recipient ───────────────────────────────────
+    # UC01: Presmerovanie zásielky používateľom (zákazník / príjemca)
 
     def get_redirect_shipment(self, shipment_id: str) -> dict | None:
+        """
+        Načíta záznam zásielky pre obrazovky UC01 podľa čísla z objednávky.
+
+        Vracia kópiu slovníka, aby rozhranie nemohlo priamo meniť interný stav bez služby.
+        Ak číslo neexistuje alebo je prázdne, nevráti žiadny záznam.
+        """
         if not shipment_id:
             return None
         record = self._uc01_shipments.get(shipment_id.strip().upper())
@@ -171,6 +178,12 @@ class ShipmentService:
         return dict(record)
 
     def can_redirect_shipment(self, shipment: dict) -> tuple[bool, str]:
+        """
+        Kontrola vstupných podmienok UC01: či je ešte možné meniť doručovacie údaje.
+
+        Blokuje zmeny pri stave „Na ceste“ a pri už doručenej zásielke.
+        Pri úspechu vráti dvojicu (pravda, prázdny dôvod chyby).
+        """
         status = shipment.get("status", "")
         if status == "Na ceste":
             return False, "Zmena doručovacích informácií nieje možná, keď je balík už na ceste."
@@ -179,6 +192,18 @@ class ShipmentService:
         return True, ""
 
     def evaluate_redirect_address(self, shipment: dict, new_postal_code: str) -> dict:
+        """
+        Vyhodnotí novú adresu pri presmerovaní: vzdialenosť a „región“.
+
+        Kľúčové časti:
+        - overenie PSČ (minimálna dĺžka);
+        - výpočet vzdialenosti – ak presahuje 550 km, služba nie je dostupná (výnimka);
+        - porovnanie prvých dvoch číslic PSČ ako zjednodušenie „v dosahu pôvodného depa“
+          oproti inému regiónu; pri zmene regiónu sa doplatok vypočíta pomocnou metódou.
+
+        Vráti slovník: pri chybe dôvod v poli reason; pri úspechu aj vzdialenosť v km,
+        príznak rovnakého regiónu a výšku doplatku.
+        """
         new_code = (new_postal_code or "").strip()
         old_code = shipment.get("postal_code", "").strip()
 
@@ -196,6 +221,7 @@ class ShipmentService:
                 "distance_km": distance_km,
             }
 
+        # Prvé dve číslice PSČ: „v dosahu pôvodného depa“ (vetva A) vs. iný región (vetva B + doplatok).
         same_region = old_code[:2] == new_code[:2]
         surcharge = 0.0 if same_region else self._compute_surcharge(distance_km)
         return {
@@ -212,6 +238,14 @@ class ShipmentService:
         new_postal_code: str,
         surcharge_paid: bool,
     ) -> dict:
+        """
+        Trvalo zapíše novú adresu doručenia po úspešnom priebehu UC01.
+
+        Opätovne kontroluje existenciu zásielky, či je presmerovanie povolené, stav „Doručuje sa“
+        a výsledok vyhodnotenia novej adresy. Ak je doplatok väčší ako nula, vyžaduje potvrdenú úhradu.
+        Poznámku o informovaní kuriéra alebo dispečera uloží podľa toho, či ide o ten istý región.
+        V odpovedi uvedie aj zoznam rolí pre notifikačnú službu (kuriér oproti dispečerovi pri doplatku).
+        """
         shipment = self._uc01_shipments.get(shipment_id.strip().upper())
         if not shipment:
             return {"ok": False, "message": "Zásielka neexistuje."}
@@ -249,6 +283,13 @@ class ShipmentService:
         }
 
     def validate_new_delivery_date(self, new_date: date | None, reference_date: date | None = None) -> str | None:
+        """
+        Validácia nového dátumu doručenia – alternatívny scenár UC01.
+
+        Dátum nesmie byť v minulosti a nesmie presiahnuť jeden týždeň oproti referenčnému
+        (aktuálny plánovaný dátum doručenia alebo dnes, podľa výpočtu základného dátumu v kóde).
+        Ak je dátum v poriadku, nevráti text chyby; inak vráti správu pre používateľa.
+        """
         if new_date is None:
             return "Zadajte dátum doručenia."
 
@@ -263,6 +304,12 @@ class ShipmentService:
         return None
 
     def apply_delivery_date_change(self, shipment_id: str, new_date: date) -> dict:
+        """
+        Zapíše nový dátum doručenia (alternatívny scenár UC01).
+
+        Rovnaké vstupné obmedzenia ako pri adrese (vrátane stavu „Doručuje sa“).
+        Po úspechu vráti text notifikácie pre kuriéra (v mocku sa upozornenie vždy odošle).
+        """
         shipment = self._uc01_shipments.get(shipment_id.strip().upper())
         if not shipment:
             return {"ok": False, "message": "Zásielka neexistuje."}
@@ -286,6 +333,12 @@ class ShipmentService:
         }
 
     def prepare_redirect_surcharge(self, shipment_id: str, surcharge: float) -> None:
+        """
+        Pripraví stav platby pred potvrdením zmeny adresy.
+
+        Uloží vypočítaný doplatok do poľa čakajúceho doplatku a nastaví stav platby tak,
+        aby rozhranie mohlo pred finálnym zápisom adresy vynútiť klik na „Zaplatiť“.
+        """
         shipment = self._uc01_shipments.get(shipment_id.strip().upper())
         if not shipment:
             return
@@ -293,6 +346,11 @@ class ShipmentService:
         shipment["payment_status"] = "nezaplatená" if surcharge > 0 else shipment.get("payment_status", "nezaplatená")
 
     def mark_redirect_payment_paid(self, shipment_id: str) -> dict:
+        """
+        Simuluje úhradu doplatku alebo neuhradenej sumy pred dokončením presmerovania.
+
+        Po zaplatení môže rozhranie dokončiť zmenu adresy so zaplateným doplatkom.
+        """
         shipment = self._uc01_shipments.get(shipment_id.strip().upper())
         if not shipment:
             return {"ok": False, "message": "Zásielka neexistuje."}
@@ -313,7 +371,7 @@ class ShipmentService:
     def update_status(self, status: str):
         pass
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # Pomocne funkcie
 
     @staticmethod
     def _to_float(value) -> float:
@@ -324,6 +382,11 @@ class ShipmentService:
 
     @staticmethod
     def _estimate_distance_km(code_a: str, code_b: str) -> int:
+        """
+        Zjednodušený odhad vzdialenosti medzi dvoma PSČ.
+
+        Používa sa pri limite 550 km a pri výpočte doplatku; ide o zjednodušenú simuláciu, nie mapové API.
+        """
         if code_a == code_b:
             return 5
         try:
@@ -334,6 +397,11 @@ class ShipmentService:
 
     @staticmethod
     def _compute_surcharge(distance_km: int) -> float:
+        """
+        Vypočíta doplatok pri presmerovaní do iného „regiónu“.
+
+        Pri krátkej vzdialenosti vráti 0; inak lineárna zložka nad prahom 120 km.
+        """
         if distance_km <= 120:
             return 0.0
         return round(1.5 + (distance_km - 120) * 0.015, 2)

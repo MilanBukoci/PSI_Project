@@ -1,3 +1,10 @@
+"""
+Obrazovky UC01 – Presmerovanie zásielky používateľom.
+
+Hlavný scenár: zadanie čísla zásielky, zobrazenie detailu, zmena adresy (vzdialenosť,
+región, doplatok, notifikácie kuriér/dispečer) alebo alternatíva – zmena dátumu doručenia.
+Logika stavov a výpočtov je v triede ShipmentService (súbor services/shipment_service.py).
+"""
 from datetime import date
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
@@ -9,7 +16,10 @@ from user_screens.home import HomeScreen
 
 
 class _UC01PopupMixin:
+    """Spoločné okná pre potvrdenia a jednoduché správy v rámci UC01."""
+
     def _open_confirm_popup(self, title: str, message: str, on_confirm, confirm_text: str = "Potvrdiť"):
+        """Dialóg Potvrdiť/Zrušiť pred zápisom zmeny (napr. potvrdenie zmeny adresy)."""
         content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(12))
         lbl = Label(text=message, halign="center", valign="middle")
         lbl.bind(size=lbl.setter("text_size"))
@@ -33,6 +43,7 @@ class _UC01PopupMixin:
         on_confirm()
 
     def _message_popup(self, title: str, message: str):
+        """Informačné okno po úspechu alebo pri nutnosti najprv zaplatiť doplatok."""
         content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(12))
         lbl = Label(text=message, halign="center", valign="middle")
         lbl.bind(size=lbl.setter("text_size"))
@@ -46,7 +57,11 @@ class _UC01PopupMixin:
 
 
 class UC01RedirectScreen(BaseScreen):
-    """UC01 screen 1: vyhľadanie zásielky."""
+    """
+    UC01 – prvá obrazovka: zadanie čísla zásielky z potvrdenia objednávky.
+
+    Po nájdení záznamu uloží výber do atribútu aplikácie uc01_selected_id a otvorí detail.
+    """
 
     def header_subtitle(self):
         return "COURIER SERVICES s.r.o."
@@ -60,6 +75,7 @@ class UC01RedirectScreen(BaseScreen):
         self.error_label.text = ""
 
     def build_content(self):
+        """Zostavenie formulára na vyhľadanie zásielky podľa čísla zásielky."""
         ca = self.content_area
         ca.add_widget(Label(size_hint_y=None, height=dp(30)))
         main_lbl = Label(
@@ -97,6 +113,7 @@ class UC01RedirectScreen(BaseScreen):
         ca.add_widget(Label(size_hint_y=1))
 
     def _on_show_details(self, *_):
+        """Skontroluje vstup a presmeruje na obrazovku detailu zásielky, ak záznam existuje."""
         shipment_id = self.shipment_id_input.text.strip().upper()
         shipment = self.app.shipment_service.get_redirect_shipment(shipment_id)
         if not shipment:
@@ -109,7 +126,12 @@ class UC01RedirectScreen(BaseScreen):
 
 
 class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
-    """UC01 screen 2: detail zásielky + akcie zmeny."""
+    """
+    UC01 – druhá obrazovka: zobrazenie údajov zásielky a tlačidlá „Zmeniť“ pri adrese a dátume.
+
+    Pri stave „Na ceste“ sa akcie skryjú (zhoda s obmedzením zmeny počas doručovania).
+    Pri doplatku za iný región sa najprv vyžaduje platba, potom zápis novej adresy cez službu zásielok.
+    """
 
     def header_subtitle(self):
         return "COURIER SERVICES s.r.o."
@@ -119,10 +141,12 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
 
     def on_enter(self):
         super().on_enter()
+        # Po zaplatení doplatku: uložená nová adresa a PSČ, kým sa neuloží trvalá zmena v službe zásielok.
         self._pending_address_change: tuple[str, str] | None = None
         self._refresh_data()
 
     def build_content(self):
+        """Hlavička s návratom, riadky údajov a sekcia platby."""
         ca = self.content_area
 
         back_btn = RoundedButton(
@@ -159,6 +183,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         ca.add_widget(self.error_label)
 
     def _line_with_value(self, title: str) -> Label:
+        """Jeden riadok UI: popisok + hodnota."""
         row = BoxLayout(orientation="vertical", spacing=dp(2), size_hint_y=None, height=dp(48))
         title_lbl = Label(text=title, font_size=dp(12), color=Colors.DARK_TEXT, halign="left", size_hint_y=None, height=dp(18))
         title_lbl.bind(size=title_lbl.setter("text_size"))
@@ -170,6 +195,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         return value
 
     def _line_with_action(self, title: str, on_press, button_text: str = "Zmeniť") -> tuple[Label, RoundedButton]:
+        """Riadok s tlačidlom (napr. „Zmeniť“ pri adrese alebo dátume podľa UC01)."""
         row = BoxLayout(orientation="horizontal", spacing=dp(8), size_hint_y=None, height=dp(46))
         left = BoxLayout(orientation="vertical", spacing=dp(2))
         title_lbl = Label(text=title, font_size=dp(12), color=Colors.DARK_TEXT, halign="left", size_hint_y=None, height=dp(18))
@@ -187,6 +213,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         return value, btn
 
     def _refresh_data(self):
+        """Načíta zásielku zo služby, zobrazí stav a podľa pravidiel presmerovania a stavu „Na ceste“ zobrazí alebo skryje akcie."""
         shipment_id = getattr(self.app, "uc01_selected_id", "")
         shipment = self.app.shipment_service.get_redirect_shipment(shipment_id)
         if not shipment:
@@ -196,6 +223,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         self.current_shipment = shipment
         can_redirect, message = self.app.shipment_service.can_redirect_shipment(shipment)
         self.error_label.text = "" if can_redirect else message
+        # „Na ceste“ – v UI sa berie ako obdoba „už sa nedá meniť“.
         in_transit = shipment.get("status", "").strip().lower() == "na ceste"
 
         self.id_value.text = shipment["id"]
@@ -233,10 +261,17 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             self.payment_btn.size = (0, dp(28))
 
     def _on_back(self, *_):
+        """Návrat na obrazovku uloženú pri otvorení detailu (domov alebo vyhľadávanie zásielky)."""
         target = getattr(self.app, "uc01_return_screen", "uc01_redirect")
         self.go_to(target, "right")
 
     def _on_edit_address(self, *_):
+        """
+        Hlavný scenár zmeny adresy: dialóg, vyhodnotenie vzdialenosti a regiónu v službe,
+        prípadne doplatok a potvrdenie.
+
+        Ak je doplatok kladný, uloží novú adresu dočasne a používateľ musí najprv zaplatiť.
+        """
         can_redirect, message = self.app.shipment_service.can_redirect_shipment(self.current_shipment)
         if not can_redirect:
             self.error_label.text = message
@@ -295,6 +330,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         popup.open()
 
     def _confirm_address_change(self, new_address: str, new_postal: str, surcharge_paid: bool):
+        """Medzikrok: explicitné potvrdenie zmeny adresy pred volaním služby."""
         self._open_confirm_popup(
             "Potvrdenie",
             "Naozaj chcete zmeniť adresu doručenia?",
@@ -303,6 +339,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         )
 
     def _apply_address_change(self, new_address: str, new_postal: str, surcharge_paid: bool):
+        """Zápis adresy cez službu zásielok a odoslanie upozornení kuriérovi alebo dispečerovi."""
         result = self.app.shipment_service.apply_redirect_address(
             shipment_id=self.current_shipment["id"],
             new_address=new_address,
@@ -317,7 +354,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             if role == "customer":
                 msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola úspešne zmenená."
             elif role == "dispatcher":
-                # Notifikácia v zdieľanej fronte „dispatcher“, nie špecifikum UC02 wizardu.
+                # Upozornenie pre dispečing (interný identifikátor roly v notifikačnej službe).
                 msg = (
                     f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola zmenená "
                     "a bol vygenerovaný doplatok, je potrebné preplánovanie."
@@ -330,6 +367,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         self._refresh_data()
 
     def _on_edit_date(self, *_):
+        """Alternatívny scenár UC01: zmena dátumu (validácia v službe, notifikácia kuriérovi)."""
         can_redirect, message = self.app.shipment_service.can_redirect_shipment(self.current_shipment)
         if not can_redirect:
             self.error_label.text = message
@@ -379,6 +417,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         popup.open()
 
     def _on_pay_surcharge(self, *_):
+        """Úhrada doplatku; ak je po platbe pripravená zmena adresy, dokončí sa zápis v jednom kroku."""
         result = self.app.shipment_service.mark_redirect_payment_paid(self.current_shipment["id"])
         if not result["ok"]:
             self.error_label.text = result["message"]
@@ -393,4 +432,5 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
         self._message_popup("Platba", "Poplatok úspešne zaplatený")
         self._refresh_data()
 
+# Registrácia karty na domovskej obrazovke.
 HomeScreen.register_action("", "Presmerovať", "Moju zásielku", "uc01_redirect")
