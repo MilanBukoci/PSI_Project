@@ -237,6 +237,7 @@ class BaseScreen(Screen):
 
         # Ak sme už na notifikačnej obrazovke, nič nerob
         current = self.manager.current
+        # uc02_notifications = UC02 dispečer; uc04 kuriér; notifications zákazník.
         if current in ("uc04_notifications", "uc02_notifications", "notifications"):
             return
 
@@ -245,6 +246,7 @@ class BaseScreen(Screen):
             self.app.uc04_return_screen = self.manager.current
             self.go_to("uc04_notifications")
             return
+        # Dispečer: paralela k kuriérskej uc04_notifications, vlastný KV screen + návrat.
         if role == "dispatcher" and self.manager.has_screen("uc02_notifications"):
             self.app.uc02_return_screen = self.manager.current
             self.go_to("uc02_notifications")

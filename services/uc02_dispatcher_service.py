@@ -1,6 +1,9 @@
 """
-services/uc02_dispatcher_service.py – Business logic for UC02: Dispatcher assigns
-shipments to couriers.  Uses mock/hardcoded data until a real backend is connected.
+Business logika pre UC02 „Pridelenie zásielky kuriérovi“.
+
+Dispečer vyberá nepridelené zásielky a priradí ich vybranému kuriérovi. Implementácia
+validuje kapacitu a dostupnosť podľa scenárov UC: neuloží viac zásielok než zostáva voľných
+miest; odmietne kuriéra mimo práce alebo s plnou kapacitou.
 """
 
 import logging
@@ -10,9 +13,10 @@ from models.shipment import Shipment, PackageDetails, Address
 log = logging.getLogger(__name__)
 
 
-# ── Mock unassigned shipments ─────────────────────────────────────────────────
+# ── Mock zásielky pre UC02 ────────────────────────────────────────────────────
+# Zmes pending (na prídelenie) a jednej už pridelenej zásielky na ukážku stavu „pridelená“.
 def _make_mock_unassigned() -> list[Shipment]:
-    """Shipments that have been created but not yet assigned to any courier."""
+    """Zásielky v systéme; časť bez kuriéra má status pending a žiadny assigned_courier_id."""
     return [
         Shipment(
             id="ZP-20260427-1001",
@@ -85,7 +89,7 @@ def _make_mock_unassigned() -> list[Shipment]:
     ]
 
 
-# ── Mock couriers ─────────────────────────────────────────────────────────────
+# ── Mock kuriéri s rôznymi stavmi (dostupný / mimo práce / plná kapacita) ─────
 def _make_mock_couriers() -> list[Courier]:
     return [
         Courier(id="123456", name="Marek Sloboda",
@@ -100,28 +104,29 @@ def _make_mock_couriers() -> list[Courier]:
 
 
 class UC02DispatcherService:
-    """Handles dispatcher workflow for UC02 – assigning shipments to couriers."""
+    """Jediný zdroj pravdy pre UC02: zoznam zásielok, kuriérov a simulácia „push“ kuriérovi."""
 
     def __init__(self):
         self._shipments: list[Shipment] = _make_mock_unassigned()
         self._couriers: list[Courier] = _make_mock_couriers()
-        self._notifications: dict[str, list[str]] = {}  # courier_id -> messages
+        # Textová „notifikácia“ kuriérovi po pridelení; v produkcii by išla cez push / API.
+        self._notifications: dict[str, list[str]] = {}  # courier_id -> história správ
 
     # ── Shipment queries ──────────────────────────────────────────────────────
 
     def get_all_shipments(self) -> list[dict]:
-        """Return all shipments as dicts for screens."""
+        """Všetky zásielky pre obrazovku so zoznamom (vrátane už pridelenej ukážky)."""
         return [self._to_dict(s) for s in self._shipments]
 
     def get_unassigned_shipments(self) -> list[dict]:
-        """Return only shipments that have not been assigned yet."""
+        """Len zásielky vhodné na pridelenie podľa biznis pravidiel UC02."""
         return [self._to_dict(s) for s in self._shipments
                 if s.assigned_courier_id is None and s.status == "pending"]
 
     # ── Courier queries ───────────────────────────────────────────────────────
 
     def get_couriers(self) -> list[dict]:
-        """Return all couriers with their availability and load."""
+        """Údaje pre karty kuriérov; is_full používa aj UI na farebný stav priebehu."""
         result = []
         for c in self._couriers:
             result.append({
@@ -140,19 +145,15 @@ class UC02DispatcherService:
         self, shipment_ids: list[str], courier_id: str
     ) -> dict:
         """
-        Assign selected shipments to the chosen courier.
+        Hlavný krok UC02 po potvrdení na obrazovke: atomicky aktualizuje zásielky a load kuriéra.
 
-        Returns dict with:
-            ok: bool
-            message: str
-            assigned_count: int (on success)
+        Výstup: ok, message pre UI, pri úspechu assigned_count a text kuriérskej „notifikácie“.
         """
-        # Find courier
         courier = self._get_courier(courier_id)
         if courier is None:
             return {"ok": False, "message": "Kuriér neexistuje."}
 
-        # Alt. scenario 5.1 – courier not at work
+        # Alternatívny scenár: kuriér nemá zmysel priradiť („nie je v práci“).
         if not courier.is_available:
             return {
                 "ok": False,
@@ -160,10 +161,10 @@ class UC02DispatcherService:
                            f"Vyberte iného kuriéra.",
             }
 
-        # Exception – courier fully loaded
+        # Bez voľnej kapacity — žiadny kus sa neuloží, dispečer musí vybrať iného.
         remaining_capacity = courier.max_load - courier.current_load
         if remaining_capacity <= 0:
-            # Notify dispatcher
+            # Nie je kde „uložiť“ ďalšie kusy — result ide späť do UI ako červená hláška.
             return {
                 "ok": False,
                 "message": f"Kuriér {courier.name} je plne vyťažený "
@@ -171,7 +172,7 @@ class UC02DispatcherService:
                            f"Zásielka nebude pridelená.",
             }
 
-        # Check how many we can actually assign
+        # Preskočiť neznáme ID alebo už pridelené (ochrana pred duplicitným výberom / starým stavom).
         shipments_to_assign = []
         for sid in shipment_ids:
             s = self._get_shipment(sid)
@@ -181,6 +182,7 @@ class UC02DispatcherService:
         if not shipments_to_assign:
             return {"ok": False, "message": "Žiadna platná nepridelená zásielka."}
 
+        # Jedna batch operácia: buď vojde celý výber do kapacity, alebo zamietnutie všetko.
         if len(shipments_to_assign) > remaining_capacity:
             return {
                 "ok": False,
@@ -189,7 +191,6 @@ class UC02DispatcherService:
                            f"{len(shipments_to_assign)}.",
             }
 
-        # ── Assign ────────────────────────────────────────────────────────────
         for s in shipments_to_assign:
             s.assigned_courier_id = courier.id
             s.status = "pridelená"
@@ -197,7 +198,7 @@ class UC02DispatcherService:
 
         courier.current_load += len(shipments_to_assign)
 
-        # Notify courier (mock)
+        # Náhrada odoslania správy kuriérovi po úspešnom pridelení
         note = (
             f"Máte {len(shipments_to_assign)} nových zásielok na doručenie. "
             f"Vaša trasa bola automaticky aktualizovaná."
@@ -215,7 +216,7 @@ class UC02DispatcherService:
     # ── Notifications ─────────────────────────────────────────────────────────
 
     def get_notifications(self, courier_id: str) -> list[str]:
-        """Return pending notifications for a courier."""
+        """História „odoslaných“ správ konkrétnemu kuriérovi (mock rozšírenie UC02)."""
         return self._notifications.get(courier_id, [])
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -234,6 +235,7 @@ class UC02DispatcherService:
 
     @staticmethod
     def _to_dict(s: Shipment) -> dict:
+        """Flatten model na dict pre Kivy prvky bez priamej závislosti od dataclass."""
         return {
             "id": s.id,
             "sender": f"{s.sender.first_name} {s.sender.last_name}",

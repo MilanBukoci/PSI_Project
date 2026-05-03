@@ -5,6 +5,7 @@ MOCK_USERS = [
     {"email": "customer2@test.com", "password": "1234", "role": "customer", "name": "Peter Horváth"},
     {"email": "courier1@test.com",  "password": "1234", "role": "courier",  "name": "Marek Sloboda", "id": "123456"},
     {"email": "courier2@test.com",  "password": "1234", "role": "courier",  "name": "Tomáš Kováč", "id": "654321"},
+    # Dispečer – po login ide na wizard UC02 (pridelenie zásielok); id D001 len pre rozšírenia účtu.
     {"email": "dispatcher1@test.com", "password": "1234", "role": "dispatcher", "name": "Adam Dispečer", "id": "D001"},
 ]
 

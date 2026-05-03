@@ -317,6 +317,7 @@ class UC01RedirectDetailScreen(BaseScreen, _UC01PopupMixin):
             if role == "customer":
                 msg = f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola úspešne zmenená."
             elif role == "dispatcher":
+                # Notifikácia v zdieľanej fronte „dispatcher“, nie špecifikum UC02 wizardu.
                 msg = (
                     f"Upozornenie: Zásielka {self.current_shipment['id']} – adresa doručenia bola zmenená "
                     "a bol vygenerovaný doplatok, je potrebné preplánovanie."
