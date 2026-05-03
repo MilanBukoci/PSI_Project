@@ -234,6 +234,12 @@ class BaseScreen(Screen):
     def _on_notifications_press(self, *_):
         if not self.manager:
             return
+
+        # Ak sme už na notifikačnej obrazovke, nič nerob
+        current = self.manager.current
+        if current in ("uc04_notifications", "uc02_notifications", "notifications"):
+            return
+
         role = getattr(self.app, "user_role", "")
         if role == "courier" and self.manager.has_screen("uc04_notifications"):
             self.app.uc04_return_screen = self.manager.current
